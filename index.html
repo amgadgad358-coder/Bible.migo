@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>✝️ الكتاب المقدس</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div id="home-screen" class="screen active">
+    <header class="main-header">
+      <h1>✝️ الكتاب المقدس</h1>
+      <p class="subtitle">كلمة الله الحية</p>
+    </header>
+
+    <div class="menu-grid">
+      <div class="menu-card" onclick="openTestament('old')">
+        <div class="icon">📜</div>
+        <h3>العهد القديم</h3>
+        <p>39 سفر</p>
+      </div>
+
+      <div class="menu-card" onclick="openTestament('new')">
+        <div class="icon">✝️</div>
+        <h3>العهد الجديد</h3>
+        <p>27 سفر</p>
+      </div>
+
+      <div class="menu-card" onclick="showDailyVerse()">
+        <div class="icon">🌞</div>
+        <h3>آية اليوم</h3>
+        <p>كلمة تشجعك</p>
+      </div>
+
+      <div class="menu-card" onclick="showFavorites()">
+        <div class="icon">❤️</div>
+        <h3>المفضلة</h3>
+        <p>آياتك المحفوظة</p>
+      </div>
+
+      <div class="menu-card" onclick="showSearch()">
+        <div class="icon">🔍</div>
+        <h3>بحث</h3>
+        <p>ابحث في الكتاب</p>
+      </div>
+
+      <div class="menu-card" onclick="showReadingPlan()">
+        <div class="icon">📅</div>
+        <h3>خطة القراءة</h3>
+        <p>إقرأ في سنة</p>
+      </div>
+
+      <div class="menu-card" onclick="showSettings()">
+        <div class="icon">⚙️</div>
+        <h3>الإعدادات والتواصل</h3>
+        <p>الإعدادات وواتساب</p>
+      </div>
+    </div>
+
+    <footer class="migo-footer">القائمة الرئيسية صنع بواسطة <strong>ميجو</strong></footer>
+    </div>
+  </div>
+
+  <div id="books-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2 id="books-title">العهد الجديد</h2>
+      <span></span>
+    </header>
+    <div id="books-list" class="books-list"></div>
+  </div>
+
+  <div id="chapters-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="backToBooks()">→</button>
+      <h2 id="chapters-title">إنجيل يوحنا</h2>
+      <span></span>
+    </header>
+    <div id="chapters-grid" class="chapters-grid"></div>
+  </div>
+
+  <div id="reading-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="backToChapters()">→</button>
+      <h2 id="reading-title">يوحنا 3</h2>
+      <button onclick="toggleFavorite()" id="fav-btn">🤍</button>
+    </header>
+
+    <div class="reading-controls">
+      <button onclick="changeFontSize(-1)">A-</button>
+      <button onclick="toggleDarkMode()" id="theme-btn">🌙</button>
+      <button onclick="speakVerses()" id="speak-btn">🔊</button>
+      <button onclick="changeFontSize(1)">A+</button>
+    </div>
+
+    <div id="audio-progress-bar" class="audio-progress-bar">
+      <div class="audio-info">
+        <span id="audio-time-current">0:00</span>
+        <span id="audio-status">اضغط 🔊 لبدء القراءة</span>
+        <span id="audio-time-total">0:00</span>
+      </div>
+      <div class="audio-track" id="audio-track">
+        <div class="audio-fill" id="audio-fill"></div>
+        <div class="audio-thumb" id="audio-thumb"></div>
+      </div>
+    </div>
+
+    <div id="verses-container" class="verses-container"></div>
+  </div>
+
+  <div id="daily-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>آية اليوم</h2>
+      <span></span>
+    </header>
+    <div class="daily-verse-card">
+      <div class="sun-icon">🌞</div>
+      <p id="daily-text" class="daily-text"></p>
+      <p id="daily-ref" class="daily-ref"></p>
+      <button class="share-btn" onclick="shareVerse()">📤 مشاركة</button>
+    </div>
+  </div>
+
+  <div id="favorites-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>المفضلة ❤️</h2>
+      <span></span>
+    </header>
+    <div id="favorites-list" class="favorites-list"></div>
+  </div>
+
+  <div id="search-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>البحث 🔍</h2>
+      <span></span>
+    </header>
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="ابحث بكلمة..." oninput="performSearch()">
+    </div>
+    <div id="search-results" class="search-results"></div>
+  </div>
+
+  <div id="settings-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>الإعدادات والتواصل ⚙️</h2>
+      <span></span>
+    </header>
+
+    <div class="settings-container">
+      <section class="settings-card">
+        <h3>إعدادات العرض</h3>
+        <div class="setting-row">
+          <div>
+            <strong>الوضع الليلي</strong>
+            <p>تبديل مظهر التطبيق</p>
+          </div>
+          <button class="setting-action" onclick="toggleDarkMode(); updateSettingsUI()" id="settings-theme-btn">🌙</button>
+        </div>
+        <div class="setting-row">
+          <div>
+            <strong>حجم الخط</strong>
+            <p id="settings-font-size">20px</p>
+          </div>
+          <div class="font-actions">
+            <button class="setting-action" onclick="changeFontSize(-1); updateSettingsUI()">A-</button>
+            <button class="setting-action" onclick="changeFontSize(1); updateSettingsUI()">A+</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="contact-card">
+        <div class="contact-icon">💬</div>
+        <h3>التواصل مع ميجو</h3>
+        <p>للتواصل والاستفسارات يمكنك مراسلتنا عبر واتساب.</p>
+        <a class="whatsapp-btn" href="https://wa.me/201221902098" target="_blank" rel="noopener noreferrer">
+          💚 تواصل عبر واتساب
+        </a>
+        <div class="contact-number">+20 122 190 2098</div>
+      </section>
+
+      <div class="settings-footer">صنع بواسطة <strong>ميجو</strong> ✨</div>
+    </div>
+  </div>
+
+  <div id="plan-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>خطة القراءة 📅</h2>
+      <span></span>
+    </header>
+    <div class="plan-container">
+      <p>اقرأ الكتاب المقدس في سنة واحدة</p>
+      <div id="plan-list" class="plan-list"></div>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
