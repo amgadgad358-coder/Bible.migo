@@ -9,6 +9,7 @@
 </head>
 <body>
 
+  <!-- ===== الشاشة الرئيسية ===== -->
   <div id="home-screen" class="screen active">
     <header class="main-header">
       <h1>✝️ الكتاب المقدس</h1>
@@ -54,15 +55,16 @@
 
       <div class="menu-card" onclick="showSettings()">
         <div class="icon">⚙️</div>
-        <h3>الإعدادات </h3>
+        <h3>الإعدادات والتواصل</h3>
         <p>الإعدادات وواتساب</p>
       </div>
     </div>
 
-    <footer class="migo-footer"> صنع بواسطة <strong>ميجو</strong></footer>
+    <footer class="migo-footer">القائمة الرئيسية صنع بواسطة <strong>ميجو</strong></footer>
     </div>
   </div>
 
+  <!-- ===== شاشة الأسفار ===== -->
   <div id="books-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -72,6 +74,7 @@
     <div id="books-list" class="books-list"></div>
   </div>
 
+  <!-- ===== شاشة الإصحاحات ===== -->
   <div id="chapters-screen" class="screen">
     <header class="top-bar">
       <button onclick="backToBooks()">→</button>
@@ -81,6 +84,7 @@
     <div id="chapters-grid" class="chapters-grid"></div>
   </div>
 
+  <!-- ===== شاشة القراءة ===== -->
   <div id="reading-screen" class="screen">
     <header class="top-bar">
       <button onclick="backToChapters()">→</button>
@@ -95,6 +99,7 @@
       <button onclick="changeFontSize(1)">A+</button>
     </div>
 
+    <!-- ===== شريط التقدم الصوتي ===== -->
     <div id="audio-progress-bar" class="audio-progress-bar">
       <div class="audio-info">
         <span id="audio-time-current">0:00</span>
@@ -110,6 +115,7 @@
     <div id="verses-container" class="verses-container"></div>
   </div>
 
+  <!-- ===== شاشة آية اليوم ===== -->
   <div id="daily-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -124,6 +130,7 @@
     </div>
   </div>
 
+  <!-- ===== شاشة المفضلة ===== -->
   <div id="favorites-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -133,6 +140,7 @@
     <div id="favorites-list" class="favorites-list"></div>
   </div>
 
+  <!-- ===== شاشة البحث ===== -->
   <div id="search-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -145,6 +153,7 @@
     <div id="search-results" class="search-results"></div>
   </div>
 
+  <!-- ===== شاشة الإعدادات والتواصل ===== -->
   <div id="settings-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -188,6 +197,7 @@
     </div>
   </div>
 
+  <!-- ===== شاشة خطة القراءة ===== -->
   <div id="plan-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>

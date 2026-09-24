@@ -72,67 +72,43 @@ function fromArabicDigits(value) {
 }
 
 async function fetchRemoteChapter(bookName, chapterNum) {
+  const cacheKey = `chapter_${bookName}_${chapterNum}`;
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch(e) {}
+
   const code = (typeof bibleBookCodes !== 'undefined') ? bibleBookCodes[bookName] : null;
   if (!code) throw new Error(`لا يوجد رمز للسفر: ${bookName}`);
 
-  const url = `https://ebible.org/arb-vd/${code}${String(chapterNum).padStart(2, '0')}.htm`;
-  const response = await fetch(url, { cache: 'force-cache', mode: 'cors' });
-  if (!response.ok) throw new Error(`تعذر تحميل ${bookName} ${chapterNum}`);
+  let lastError = null;
 
-  const html = await response.text();
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  const bodyText = (doc.body?.innerText || doc.body?.textContent || '')
-    .replace(/\r/g, ' ')
-    .replace(/[\u200B-\u200D\uFEFF]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const url = `https://ebible.org/arb-vd/${code}${String(chapterNum).padStart(2, '0')}.htm`;
+      const response = await fetch(url, {cache:'no-cache', mode:'cors'});
+      if (!response.ok) throw new Error('network');
 
-  // لا نعتمد على اسم السفر أو مكان رقم الإصحاح داخل شريط التنقل؛
-  // صفحات eBible تحتوي على أرقام مكررة في أعلى وأسفل الصفحة. نبحث عن
-  // أطول سلسلة متتابعة من أرقام الآيات (1،2،3...) ونأخذ النص الواقع بينها.
-  const arabicNumber = '٠-٩';
-  const re = new RegExp(`(?:^|\\s)([${arabicNumber}]{1,3})(?=\\s)`, 'g');
-  const matches = [...bodyText.matchAll(re)];
-  const candidates = [];
+      const html = await response.text();
+      const text = html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
 
-  for (let i = 0; i < matches.length; i++) {
-    const first = Number(fromArabicDigits(matches[i][1]));
-    if (first !== 1) continue;
-
-    const seq = [matches[i]];
-    let expected = 2;
-    for (let j = i + 1; j < matches.length; j++) {
-      const n = Number(fromArabicDigits(matches[j][1]));
-      if (n === expected) {
-        seq.push(matches[j]);
-        expected++;
-      } else if (n === 1) {
-        break;
+      const verses = text.split(/(?=\s[٠-٩]+\s)/).map(v=>v.trim()).filter(v=>v.length>5);
+      if (verses.length) {
+        localStorage.setItem(cacheKey, JSON.stringify(verses));
+        return verses;
       }
+    } catch(err) {
+      lastError = err;
     }
-    if (seq.length >= 2) candidates.push(seq);
   }
 
-  const best = candidates.sort((a, b) => b.length - a.length)[0];
-  if (!best) throw new Error(`تعذر تحليل نص ${bookName} ${chapterNum}`);
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch(e) {}
 
-  const verses = [];
-  for (let i = 0; i < best.length; i++) {
-    const current = best[i];
-    const next = best[i + 1];
-    const textStart = current.index + current[0].lastIndexOf(current[1]) + current[1].length;
-    const textEnd = next ? next.index + next[0].lastIndexOf(next[1]) : bodyText.length;
-    const verseText = bodyText.slice(textStart, textEnd)
-      .replace(/^[\s:؛—-]+/, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (verseText) verses.push(verseText);
-  }
-
-  if (!verses.length) throw new Error(`تعذر تحليل نص ${bookName} ${chapterNum}`);
-  return verses;
+  throw lastError || new Error('فشل تحميل الإصحاح');
 }
-
 async function getChapterVerses(bookName, chapterNum) {
   const book = Array.isArray(bibleData) ? bibleData.find(b => b.name === bookName) : null;
   const localVerses = book?.chapters?.[chapterNum - 1];
@@ -313,7 +289,7 @@ async function openChapter(bookName, chapterNum) {
     updateFavIcon();
   } catch (error) {
     console.error(error);
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:#b33">️ ⚠️ تعذر تحميل نص ${bookName} ${chapterNum}. تحقق من اتصال الإنترنت ثم أعد المحاولة.</div>`;
+    container.innerHTML = `<div style='text-align:center;padding:20px;color:red'>تعذر تحميل الإصحاح من المصدر الحالي. جرّب مرة أخرى بعد ثوانٍ.</div>`;
   }
 }
 // ============ تجهيز بيانات الصوت ============
