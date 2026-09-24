@@ -656,3 +656,86 @@ body.dark .contact-card p { color: #bbb; }
 .whatsapp-btn:hover { transform: translateY(-2px); opacity: .92; }
 .contact-number { margin-top: 10px; color: #8d6e63; direction: ltr; font-size: 13px; }
 .settings-footer { text-align: center; color: #8d6e63; font-size: 13px; padding: 8px; }
+
+
+/* ===== تحميل وقراءة الإصحاح ===== */
+.chapter-loading,
+.chapter-error {
+  max-width: 700px;
+  margin: 40px auto;
+  padding: 35px 20px;
+  text-align: center;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.65);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+}
+
+body.dark .chapter-loading,
+body.dark .chapter-error {
+  background: #252525;
+}
+
+.loading-spinner {
+  width: 38px;
+  height: 38px;
+  margin: 0 auto 15px;
+  border: 4px solid rgba(141,110,99,.25);
+  border-top-color: #8d6e63;
+  border-radius: 50%;
+  animation: bibleSpin .8s linear infinite;
+}
+
+@keyframes bibleSpin {
+  to { transform: rotate(360deg); }
+}
+
+.chapter-error h3 {
+  margin-bottom: 10px;
+}
+
+.chapter-error p {
+  margin-bottom: 18px;
+  color: #777;
+}
+
+.retry-chapter-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 22px;
+  background: #8d6e63;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.verses-container {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: plaintext;
+}
+
+.verse {
+  display: block;
+  direction: rtl;
+  text-align: right;
+  padding: 12px 8px;
+  margin-bottom: 14px;
+  line-height: 2.15;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.verse-text {
+  display: inline;
+  white-space: normal;
+}
+
+.verse-num {
+  display: inline-block;
+  min-width: 1.7em;
+  margin-left: 7px;
+  margin-right: 0;
+  text-align: center;
+  vertical-align: baseline;
+}

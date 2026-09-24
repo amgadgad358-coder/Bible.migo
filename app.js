@@ -1,3 +1,4 @@
+// Bible Reader Internet Text Fix v2
 // ============ المتغيرات العامة ============
 let bibleData = null;
 let currentTestament = 'old';
@@ -43,23 +44,23 @@ function showSearch() {
 
 // ============ تحميل الكتاب المقدس ============
 async function loadBibleData() {
+  // نحمّل البيانات المحلية فقط كخطة احتياطية.
+  // عند فتح أي إصحاح سنحاول أولاً جلب النص المنظم من الإنترنت.
   try {
-    // نحمّل النص المحلي إن وُجد، لكنه لم يعد شرطاً لعمل الموقع.
-    const response = await fetch('data/bible.txt');
+    const response = await fetch('data/bible.txt', { cache: 'no-cache' });
     if (response.ok) {
       const text = await response.text();
       bibleData = parseBibleText(text);
     } else {
       bibleData = [];
     }
-    console.log('✅ تم تجهيز بيانات الكتاب المقدس. النص الكامل يُحمّل تلقائياً عند فتح الإصحاح.');
-    return true;
   } catch (error) {
-    // الموقع يستطيع العمل بالكامل بالنص المنشور على eBible.org حتى لو لم يوجد الملف المحلي.
     bibleData = [];
-    console.warn('تعذر تحميل النص المحلي، سيتم استخدام المصدر الكامل على الإنترنت:', error);
-    return true;
+    console.warn('تعذر تحميل النسخة المحلية:', error);
   }
+
+  console.log('✅ تم تجهيز بيانات الكتاب. سيتم جلب نص الإصحاح من الإنترنت عند فتحه.');
+  return true;
 }
 
 const arabicDigits = '٠١٢٣٤٥٦٧٨٩';
@@ -71,87 +72,257 @@ function fromArabicDigits(value) {
   return String(value).replace(/[٠-٩]/g, d => String(arabicDigits.indexOf(d)));
 }
 
-async function fetchRemoteChapter(bookName, chapterNum) {
-  const cacheKey = `chapter_${bookName}_${chapterNum}`;
-  try {
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) return JSON.parse(cached);
-  } catch(e) {}
+function normalizeArabicText(text) {
+  return String(text || '')
+    .replace(/\uFEFF/g, '')
+    .replace(/\u200B/g, '')
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
 
-  const code = (typeof bibleBookCodes !== 'undefined') ? bibleBookCodes[bookName] : null;
+/*
+ * eBible.org يعرض كل إصحاح في ملف مستقل مثل GEN01.htm.
+ * نقرأ النص من الصفحة ونستخرج رقم الآية + نصها، بدلاً من أخذ
+ * النص الخام للصفحة بالكامل، حتى لا تظهر العناوين والقوائم وسط الآيات.
+ */
+// ============ مصادر الإنترنت + التخزين المحلي ============
+// المصدر الأول: eBible HTML
+// المصدر الثاني: Bible SuperSearch API (SVD العربي)
+// بعد نجاح أي مصدر يتم حفظ الإصحاح في localStorage ليعمل لاحقاً حتى بدون اتصال.
+const BSS_BOOK_NAMES = {
+  'GEN':'Gen','EXO':'Ex','LEV':'Lev','NUM':'Num','DEU':'Deut','JOS':'Josh','JDG':'Judg','RUT':'Ruth',
+  '1SA':'1 Sam','2SA':'2 Sam','1KI':'1 Kgs','2KI':'2 Kgs','1CH':'1 Chr','2CH':'2 Chr','EZR':'Ezra','NEH':'Neh',
+  'EST':'Esth','JOB':'Job','PSA':'Ps','PRO':'Prov','ECC':'Eccl','SNG':'Song','ISA':'Isa','JER':'Jer','LAM':'Lam',
+  'EZK':'Ezek','DAN':'Dan','HOS':'Hos','JOL':'Joel','AMO':'Amos','OBA':'Obad','JON':'Jonah','MIC':'Mic','NAM':'Nah',
+  'HAB':'Hab','ZEP':'Zeph','HAG':'Hag','ZEC':'Zech','MAL':'Mal','MAT':'Matt','MRK':'Mark','LUK':'Luke','JHN':'John',
+  'ACT':'Acts','ROM':'Rom','1CO':'1 Cor','2CO':'2 Cor','GAL':'Gal','EPH':'Eph','PHP':'Phil','COL':'Col','1TH':'1 Thess',
+  '2TH':'2 Thess','1TI':'1 Tim','2TI':'2 Tim','TIT':'Titus','PHM':'Phlm','HEB':'Heb','JAS':'Jas','1PE':'1 Pet','2PE':'2 Pet',
+  '1JN':'1 John','2JN':'2 John','3JN':'3 John','JUD':'Jude','REV':'Rev'
+};
+
+function chapterCacheKey(bookName, chapterNum) {
+  const code = (typeof bibleBookCodes !== 'undefined' && bibleBookCodes[bookName]) || bookName;
+  return `bible_chapter_cache_v3_${code}_${Number(chapterNum)}`;
+}
+
+function readCachedChapter(bookName, chapterNum) {
+  try {
+    const cached = localStorage.getItem(chapterCacheKey(bookName, chapterNum));
+    if (!cached) return null;
+    const parsed = JSON.parse(cached);
+    if (!Array.isArray(parsed) || !parsed.length) return null;
+    return parsed.filter(v => v && Number(v.number) > 0 && String(v.text || '').trim());
+  } catch (e) {
+    console.warn('تعذر قراءة الكاش:', e);
+    return null;
+  }
+}
+
+function saveCachedChapter(bookName, chapterNum, verses, source) {
+  try {
+    const clean = verses.map(v => ({ number: Number(v.number), text: normalizeArabicText(v.text) }));
+    localStorage.setItem(chapterCacheKey(bookName, chapterNum), JSON.stringify(clean));
+    localStorage.setItem(`bible_chapter_source_${(typeof bibleBookCodes !== 'undefined' && bibleBookCodes[bookName]) || bookName}_${Number(chapterNum)}`, source);
+    localStorage.setItem('bible_last_generated', JSON.stringify({ bookName, chapterNum:Number(chapterNum), source, time:Date.now() }));
+  } catch (e) {
+    // لو امتلأت مساحة localStorage لا نفشل عرض الإصحاح.
+    console.warn('تعذر حفظ الإصحاح محلياً:', e);
+  }
+}
+
+function normalizeApiVerses(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map(v => ({ number: Number(v.verse), text: normalizeArabicText(v.text) }))
+    .filter(v => Number.isFinite(v.number) && v.number > 0 && v.text)
+    .sort((a,b) => a.number - b.number);
+}
+
+async function fetchFromBibleSuperSearch(bookName, chapterNum) {
+  const code = bibleBookCodes?.[bookName];
+  const shortName = code ? BSS_BOOK_NAMES[code] : null;
+  if (!shortName) throw new Error(`لا يوجد اسم API للسفر: ${bookName}`);
+
+  const reference = `${shortName} ${Number(chapterNum)}`;
+  const url = `https://bethie.api.biblesupersearch.com/api?bible=svd&reference=${encodeURIComponent(reference)}&data_format=minimal&page_all=true`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-store',
+    headers: { 'Accept': 'application/json' }
+  });
+  if (!response.ok) throw new Error(`Bible SuperSearch HTTP ${response.status}`);
+
+  const data = await response.json();
+  if (data?.errors?.length) throw new Error(data.errors.join('، '));
+
+  const verses = normalizeApiVerses(data?.results?.svd);
+  if (!verses.length) throw new Error('المصدر الثاني لم يُرجع آيات');
+  return verses;
+}
+
+async function fetchFromEBible(bookName, chapterNum) {
+  const code = bibleBookCodes?.[bookName];
   if (!code) throw new Error(`لا يوجد رمز للسفر: ${bookName}`);
 
-  let lastError = null;
+  const url = `https://ebible.org/arb-vd/${code}${String(chapterNum).padStart(2, '0')}.htm`;
+  const response = await fetch(url, {
+    method: 'GET',
+    cache: 'no-store',
+    mode: 'cors',
+    headers: { 'Accept': 'text/html,application/xhtml+xml' }
+  });
+  if (!response.ok) throw new Error(`eBible HTTP ${response.status}`);
 
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const url = `https://ebible.org/arb-vd/${code}${String(chapterNum).padStart(2, '0')}.htm`;
-      const response = await fetch(url, {cache:'no-cache', mode:'cors'});
-      if (!response.ok) throw new Error('network');
+  const html = await response.text();
+  if (!html || html.length < 100) throw new Error('صفحة eBible فارغة');
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const root = doc.querySelector('main, article, #main') || doc.body;
+  root.querySelectorAll('script,style,noscript,nav,header,footer,form,aside,.navbar,.menu').forEach(el => el.remove());
 
-      const html = await response.text();
-      const text = html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+  let text = normalizeArabicText(root.textContent || '')
+    .replace(/[٠-٩]/g, d => String(arabicDigits.indexOf(d)))
+    .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
 
-      const verses = text.split(/(?=\s[٠-٩]+\s)/).map(v=>v.trim()).filter(v=>v.length>5);
-      if (verses.length) {
-        localStorage.setItem(cacheKey, JSON.stringify(verses));
-        return verses;
-      }
-    } catch(err) {
-      lastError = err;
+  const matches = [];
+  const re = /(?:^|\s)([0-9]{1,3})(?=\s)/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const n = Number(m[1]);
+    if (n >= 1 && n <= 200) matches.push({number:n, index:m.index, end:re.lastIndex});
+  }
+
+  // نختار سلسلة تبدأ من 1 حتى لا نأخذ أرقاماً من واجهة الموقع.
+  const ordered = [];
+  let expected = 1;
+  for (const item of matches) {
+    if (item.number === expected) {
+      ordered.push(item);
+      expected++;
     }
   }
+  if (!ordered.length) throw new Error('تعذر استخراج آيات eBible');
 
-  try {
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) return JSON.parse(cached);
-  } catch(e) {}
-
-  throw lastError || new Error('فشل تحميل الإصحاح');
-}
-async function getChapterVerses(bookName, chapterNum) {
-  const book = Array.isArray(bibleData) ? bibleData.find(b => b.name === bookName) : null;
-  const localVerses = book?.chapters?.[chapterNum - 1];
-  if (Array.isArray(localVerses) && localVerses.length) return localVerses;
-
-  const remoteVerses = await fetchRemoteChapter(bookName, chapterNum);
-
-  // حفظ الإصحاح في الذاكرة حتى لا يُطلب مرة أخرى خلال نفس الجلسة.
-  if (!Array.isArray(bibleData)) bibleData = [];
-  let targetBook = bibleData.find(b => b.name === bookName);
-  if (!targetBook) {
-    targetBook = { name: bookName, chapters: [] };
-    bibleData.push(targetBook);
+  const verses = [];
+  for (let i=0; i<ordered.length; i++) {
+    const start = ordered[i].end;
+    const end = i+1 < ordered.length ? ordered[i+1].index : text.length;
+    const verseText = normalizeArabicText(text.slice(start,end)).replace(/^[|•·\-–—]+\s*/, '');
+    if (verseText) verses.push({number:ordered[i].number, text:verseText});
   }
-  targetBook.chapters[chapterNum - 1] = remoteVerses;
-  return remoteVerses;
+  if (!verses.length) throw new Error('تعذر استخراج نص eBible');
+  return verses;
 }
+
+async function fetchRemoteChapter(bookName, chapterNum) {
+  // 1) لو الإصحاح اتولد قبل كده، نستخدم النسخة المحفوظة فوراً.
+  const cached = readCachedChapter(bookName, chapterNum);
+  if (cached?.length) {
+    console.log(`📦 تم تحميل ${bookName} ${chapterNum} من الحفظ المحلي`);
+    return cached;
+  }
+
+  const sources = [
+    { name:'eBible', fn:() => fetchFromEBible(bookName, chapterNum) },
+    { name:'Bible SuperSearch', fn:() => fetchFromBibleSuperSearch(bookName, chapterNum) }
+  ];
+
+  let lastError = null;
+  for (const source of sources) {
+    for (let attempt=1; attempt<=2; attempt++) {
+      try {
+        const verses = await source.fn();
+        if (!verses?.length) throw new Error('النص فارغ');
+        saveCachedChapter(bookName, chapterNum, verses, source.name);
+        console.log(`🌐 تم توليد ${bookName} ${chapterNum} من ${source.name} وتم حفظه`);
+        return verses;
+      } catch (err) {
+        lastError = err;
+        console.warn(`فشل ${source.name} - محاولة ${attempt}:`, err);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 250 * attempt));
+      }
+    }
+  }
+  throw lastError || new Error('فشلت كل مصادر الإنترنت');
+}
+
+async function getChapterVerses(bookName, chapterNum) {
+  // الإنترنت أولاً دائماً، لأن هذا هو المصدر الأساسي للنص.
+  try {
+    const remoteVerses = await fetchRemoteChapter(bookName, chapterNum);
+
+    // حفظ نسخة الجلسة بعد نجاح الإنترنت.
+    if (!Array.isArray(bibleData)) bibleData = [];
+    let targetBook = bibleData.find(b => b.name === bookName);
+    if (!targetBook) {
+      targetBook = { name: bookName, chapters: [] };
+      bibleData.push(targetBook);
+    }
+    targetBook.chapters[chapterNum - 1] = remoteVerses;
+
+    return remoteVerses;
+  } catch (remoteError) {
+    console.warn('فشل المصدر الإنترنتي، سيتم استخدام النسخة المحلية كاحتياط:', remoteError);
+
+    // fallback محلي إذا كان الإنترنت غير متاح.
+    const book = Array.isArray(bibleData)
+      ? bibleData.find(b => b.name === bookName)
+      : null;
+
+    const localVerses = book?.chapters?.[chapterNum - 1];
+    if (Array.isArray(localVerses) && localVerses.length) {
+      // تحويل الأسطر المحلية إلى آيات منفصلة بشكل مقروء.
+      return localVerses
+        .join(' ')
+        .split(/\s*(?=(?:[0-9٠-٩]+)\s*)/)
+        .map(v => v.trim())
+        .filter(Boolean)
+        .map((v, i) => {
+          const match = v.match(/^([0-9٠-٩]+)\s*(.*)$/);
+          return {
+            number: match ? Number(fromArabicDigits(match[1])) : i + 1,
+            text: match ? match[2].trim() : v
+          };
+        });
+    }
+
+    throw remoteError;
+  }
+}
+
 function parseBibleText(text) {
-  const lines = text.split('\n');
+  const lines = String(text || '').replace(/\uFEFF/g, '').split(/\r?\n/);
   const books = [];
   let currentBook = null;
   let currentChapter = null;
 
-  lines.forEach(line => {
-    if (line.trim() === '') return;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
 
-    if (line.startsWith('# ') && !line.startsWith('## ')) {
-      const bookName = line.substring(2).trim();
+    // يدعم # و ## حتى لو كان الملف يحتوي على BOM أو مسافات.
+    if (/^#\s+/.test(line) && !/^##\s+/.test(line)) {
+      const bookName = line.replace(/^#\s+/, '').trim();
       currentBook = { name: bookName, chapters: [] };
       books.push(currentBook);
       currentChapter = null;
-      return;
+      continue;
     }
 
-    if (line.startsWith('## ')) {
-      if (!currentBook) return;
+    if (/^##\s+/.test(line)) {
+      if (!currentBook) continue;
       currentChapter = [];
       currentBook.chapters.push(currentChapter);
-      return;
+      continue;
     }
 
-    if (currentChapter) currentChapter.push(line.trim());
-  });
+    if (currentChapter) {
+      currentChapter.push(line);
+    }
+  }
 
   return books;
 }
@@ -258,38 +429,84 @@ async function openChapter(bookName, chapterNum) {
   currentChapter = chapterNum;
 
   document.getElementById('reading-title').textContent = `${bookName} ${chapterNum}`;
+
   const container = document.getElementById('verses-container');
-  container.innerHTML = '<div style="text-align:center;padding:40px;color:#888">⏳ جارٍ تحميل نص الإصحاح...</div>';
+  container.innerHTML = `
+    <div class="chapter-loading">
+      <div class="loading-spinner"></div>
+      <div>جارٍ تحميل نص الإصحاح من الإنترنت...</div>
+    </div>
+  `;
   container.style.fontSize = fontSize + 'px';
   showScreen('reading-screen');
 
   try {
-    let verses = await getChapterVerses(bookName, chapterNum);
+    const rawVerses = await getChapterVerses(bookName, chapterNum);
+
+    // توحيد شكل البيانات سواء جاءت من الإنترنت أو من النسخة المحلية.
+    const verses = (rawVerses || [])
+      .map((item, index) => {
+        if (typeof item === 'string') {
+          return { number: index + 1, text: item };
+        }
+        return {
+          number: Number(item.number) || index + 1,
+          text: String(item.text || '').trim()
+        };
+      })
+      .filter(v => v.text);
+
     window.currentVerses = verses;
 
-    // الاحتفاظ بالعينات المحلية كحل احتياطي فقط.
-    if (!verses && typeof sampleVerses !== 'undefined') {
-      verses = sampleVerses[`${bookName}-${chapterNum}`] || null;
-      window.currentVerses = verses || [];
+    if (!verses.length) {
+      throw new Error('لم يتم العثور على نص الإصحاح');
     }
-    if (!verses) throw new Error('لم يتم العثور على نص الإصحاح');
 
     container.innerHTML = '';
+
     verses.forEach((verse, i) => {
       const p = document.createElement('div');
       p.className = 'verse';
       p.dataset.index = i;
-      p.innerHTML = `<span class="verse-num">${i + 1}</span>${verse}`;
-      p.onclick = () => toggleVerseFavorite(verse, `${bookName} ${chapterNum}: ${i + 1}`);
+
+      const num = document.createElement('span');
+      num.className = 'verse-num';
+      num.textContent = toArabicDigits(verse.number);
+
+      const text = document.createElement('span');
+      text.className = 'verse-text';
+      text.textContent = verse.text;
+
+      p.appendChild(num);
+      p.appendChild(text);
+
+      p.onclick = () =>
+        toggleVerseFavorite(
+          verse.text,
+          `${bookName} ${chapterNum}: ${verse.number}`
+        );
+
       container.appendChild(p);
     });
 
-    prepareAudioData(verses);
+    prepareAudioData(verses.map(v => v.text));
     resetAudioBar();
     updateFavIcon();
+
   } catch (error) {
-    console.error(error);
-    container.innerHTML = `<div style='text-align:center;padding:20px;color:red'>تعذر تحميل الإصحاح من المصدر الحالي. جرّب مرة أخرى بعد ثوانٍ.</div>`;
+    console.error('خطأ تحميل الإصحاح:', error);
+
+    container.innerHTML = `
+      <div class="chapter-error">
+        <div class="error-icon">⚠️</div>
+        <h3>تعذر تحميل الإصحاح</h3>
+        <p>تأكد من اتصال الإنترنت ثم اضغط المحاولة مرة أخرى.</p>
+        <button class="retry-chapter-btn"
+          onclick="openChapter(${JSON.stringify(bookName)}, ${Number(chapterNum)})">
+          🔄 المحاولة مرة أخرى
+        </button>
+      </div>
+    `;
   }
 }
 // ============ تجهيز بيانات الصوت ============
