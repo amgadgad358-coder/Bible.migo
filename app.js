@@ -146,9 +146,15 @@ async function fetchFromBibleSuperSearch(bookName, chapterNum) {
   if (!shortName) throw new Error(`لا يوجد اسم API للسفر: ${bookName}`);
 
   const reference = `${shortName} ${Number(chapterNum)}`;
-  const url = `https://bethie.api.biblesupersearch.com/api?bible=svd&reference=${encodeURIComponent(reference)}&data_format=minimal&page_all=true`;
+  const base = 'https://api.biblesupersearch.com/api';
+  const params = new URLSearchParams({
+    bible: 'svd',
+    reference,
+    data_format: 'minimal',
+    page_all: 'true'
+  });
 
-  const response = await fetch(url, {
+  const response = await fetch(`${base}?${params.toString()}`, {
     method: 'GET',
     mode: 'cors',
     cache: 'no-store',
@@ -162,6 +168,50 @@ async function fetchFromBibleSuperSearch(bookName, chapterNum) {
   const verses = normalizeApiVerses(data?.results?.svd);
   if (!verses.length) throw new Error('المصدر الثاني لم يُرجع آيات');
   return verses;
+}
+
+// احتياط إضافي لـ WebView/file:// إذا منع fetch طلب JSON.
+function fetchBibleSuperSearchJSONP(bookName, chapterNum, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    const code = bibleBookCodes?.[bookName];
+    const shortName = code ? BSS_BOOK_NAMES[code] : null;
+    if (!shortName) return reject(new Error(`لا يوجد اسم API للسفر: ${bookName}`));
+
+    const callbackName = `bssCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const script = document.createElement('script');
+    const params = new URLSearchParams({
+      bible: 'svd',
+      reference: `${shortName} ${Number(chapterNum)}`,
+      data_format: 'minimal',
+      page_all: 'true',
+      callback: callbackName
+    });
+    script.src = `https://api.biblesupersearch.com/api?${params.toString()}`;
+    script.async = true;
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+      script.remove();
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('انتهت مهلة مصدر Bible SuperSearch'));
+    }, timeoutMs);
+
+    window[callbackName] = data => {
+      cleanup();
+      if (data?.errors?.length) return reject(new Error(data.errors.join('، ')));
+      const verses = normalizeApiVerses(data?.results?.svd);
+      if (!verses.length) return reject(new Error('المصدر الثاني لم يُرجع آيات'));
+      resolve(verses);
+    };
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('تعذر الاتصال بمصدر Bible SuperSearch'));
+    };
+    document.head.appendChild(script);
+  });
 }
 
 async function fetchFromEBible(bookName, chapterNum) {
@@ -179,40 +229,69 @@ async function fetchFromEBible(bookName, chapterNum) {
 
   const html = await response.text();
   if (!html || html.length < 100) throw new Error('صفحة eBible فارغة');
+  return parseEBibleChapterHTML(html);
+}
+
+function parseEBibleChapterHTML(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const root = doc.querySelector('main, article, #main') || doc.body;
   root.querySelectorAll('script,style,noscript,nav,header,footer,form,aside,.navbar,.menu').forEach(el => el.remove());
 
-  let text = normalizeArabicText(root.textContent || '')
-    .replace(/[٠-٩]/g, d => String(arabicDigits.indexOf(d)))
+  // eBible يعرض أرقام الآيات داخل النص، أحياناً بالأرقام العربية وأحياناً الغربية.
+  // نبحث عن سلسلة 1،2،3... كاملة ونبدأ من أول رقم 1 الذي يتبعه رقم 2.
+  const arabicMap = '٠١٢٣٤٥٦٧٨٩';
+  const convertDigits = value => String(value)
+    .replace(/[٠-٩]/g, d => String(arabicMap.indexOf(d)))
     .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
 
-  const matches = [];
-  const re = /(?:^|\s)([0-9]{1,3})(?=\s)/g;
+  const text = String(root.textContent || '')
+    .replace(/\uFEFF/g, '')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+
+  const re = /(?:^|\s)([0-9٠-٩۰-۹]{1,3})(?=\s)/g;
+  const candidates = [];
   let m;
   while ((m = re.exec(text))) {
-    const n = Number(m[1]);
-    if (n >= 1 && n <= 200) matches.push({number:n, index:m.index, end:re.lastIndex});
-  }
-
-  // نختار سلسلة تبدأ من 1 حتى لا نأخذ أرقاماً من واجهة الموقع.
-  const ordered = [];
-  let expected = 1;
-  for (const item of matches) {
-    if (item.number === expected) {
-      ordered.push(item);
-      expected++;
+    const n = Number(convertDigits(m[1]));
+    if (n >= 1 && n <= 200) {
+      candidates.push({ number:n, start:m.index + (m[0].length - m[1].length), end:re.lastIndex });
     }
   }
-  if (!ordered.length) throw new Error('تعذر استخراج آيات eBible');
+
+  // لا نأخذ رقم الإصحاح الموجود في عنوان الصفحة. اختر أول 1 ثم 2 ثم 3...
+  let first = -1;
+  for (let i = 0; i < candidates.length; i++) {
+    if (candidates[i].number !== 1) continue;
+    let ok = true;
+    for (let k = 1; k <= 4; k++) {
+      if (!candidates[i + k] || candidates[i + k].number !== k + 1) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) { first = i; break; }
+  }
+  if (first < 0) throw new Error('تعذر تحديد بداية آيات eBible');
 
   const verses = [];
-  for (let i=0; i<ordered.length; i++) {
-    const start = ordered[i].end;
-    const end = i+1 < ordered.length ? ordered[i+1].index : text.length;
-    const verseText = normalizeArabicText(text.slice(start,end)).replace(/^[|•·\-–—]+\s*/, '');
-    if (verseText) verses.push({number:ordered[i].number, text:verseText});
+  for (let i = first; i < candidates.length; i++) {
+    const current = candidates[i];
+    if (current.number !== verses.length + 1) {
+      // تجاهل أي أرقام لاحقة ليست جزءاً من تسلسل الآيات.
+      if (verses.length > 0) break;
+      continue;
+    }
+    const next = candidates[i + 1];
+    const end = next ? next.start : text.length;
+    let verseText = text.slice(current.end, end)
+      .replace(/^\s*[|•·\-–—]+\s*/, '')
+      .trim();
+    if (verseText) verses.push({ number: current.number, text: normalizeArabicText(verseText) });
   }
+
   if (!verses.length) throw new Error('تعذر استخراج نص eBible');
   return verses;
 }
@@ -226,8 +305,9 @@ async function fetchRemoteChapter(bookName, chapterNum) {
   }
 
   const sources = [
-    { name:'eBible', fn:() => fetchFromEBible(bookName, chapterNum) },
-    { name:'Bible SuperSearch', fn:() => fetchFromBibleSuperSearch(bookName, chapterNum) }
+    { name:'Bible SuperSearch', fn:() => fetchFromBibleSuperSearch(bookName, chapterNum) },
+    { name:'Bible SuperSearch JSONP', fn:() => fetchBibleSuperSearchJSONP(bookName, chapterNum) },
+    { name:'eBible', fn:() => fetchFromEBible(bookName, chapterNum) }
   ];
 
   let lastError = null;
@@ -274,19 +354,29 @@ async function getChapterVerses(bookName, chapterNum) {
 
     const localVerses = book?.chapters?.[chapterNum - 1];
     if (Array.isArray(localVerses) && localVerses.length) {
-      // تحويل الأسطر المحلية إلى آيات منفصلة بشكل مقروء.
-      return localVerses
-        .join(' ')
-        .split(/\s*(?=(?:[0-9٠-٩]+)\s*)/)
-        .map(v => v.trim())
-        .filter(Boolean)
-        .map((v, i) => {
-          const match = v.match(/^([0-9٠-٩]+)\s*(.*)$/);
-          return {
-            number: match ? Number(fromArabicDigits(match[1])) : i + 1,
-            text: match ? match[2].trim() : v
-          };
-        });
+      const verses = [];
+      let verseNo = 1;
+
+      for (const raw of localVerses) {
+        const line = normalizeArabicText(raw);
+        if (!line) continue;
+
+        // بعض النسخ المحلية تحتوي رقم الآية في بداية السطر، وبعضها لا.
+        const match = line.match(/^([0-9٠-٩۰-۹]{1,3})\s*(.*)$/);
+        if (match) {
+          const n = Number(fromArabicDigits(match[1]));
+          const txt = normalizeArabicText(match[2]);
+          if (n > 0 && txt) {
+            verses.push({ number: n, text: txt });
+            verseNo = n + 1;
+            continue;
+          }
+        }
+
+        verses.push({ number: verseNo++, text: line });
+      }
+
+      return verses.sort((a,b) => a.number - b.number);
     }
 
     throw remoteError;
