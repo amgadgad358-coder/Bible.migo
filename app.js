@@ -1,14 +1,15 @@
-// Bible Reader Internet Text Fix v2
-// ============ المتغيرات العامة ============
 let bibleData = null;
 let currentTestament = 'old';
 let currentBook = null;
 let currentChapter = 1;
 let favorites = JSON.parse(localStorage.getItem('bible_favorites') || '[]');
 let fontSize = parseInt(localStorage.getItem('bible_fontSize') || '20');
+let readingFontSize = parseInt(localStorage.getItem('reading_fontSize') || '20');
+let iconScale = parseFloat(localStorage.getItem('app_icon_scale') || '1');
+if (!Number.isFinite(readingFontSize)) readingFontSize = 20;
+if (!Number.isFinite(iconScale)) iconScale = 1;
 let isDark = localStorage.getItem('bible_dark') === 'true';
 
-// ============ متغيرات الصوت ============
 let isSpeaking = false;
 let currentAudio = null;
 let currentVerseIndex = 0;
@@ -20,7 +21,6 @@ let totalWords = 0;
 let allVersesText = [];
 let isDragging = false;
 
-// ============ التنقل بين الشاشات ============
 function showScreen(screenId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(screenId).classList.add('active');
@@ -42,10 +42,792 @@ function showSearch() {
   }
 }
 
-// ============ تحميل الكتاب المقدس ============
+function openBibleMenu() {
+  showScreen('bible-menu-screen');
+}
+
+const COPTIC_API = 'https://api.coptic.io/api';
+const KATAMEROS_API = 'https://api.katameros.app';
+
+const agpeyaPrayers = [
+  {id:'matins', icon:'🌅', title:'صلاة باكر', subtitle:'صلاة الساعة الأولى', pages:20},
+  {id:'third', icon:'☀️', title:'صلاة الساعة الثالثة', subtitle:'صلاة الساعة الثالثة', pages:12},
+  {id:'sixth', icon:'🌤️', title:'صلاة الساعة السادسة', subtitle:'صلاة الساعة السادسة', pages:12},
+  {id:'ninth', icon:'🌇', title:'صلاة الساعة التاسعة', subtitle:'صلاة الساعة التاسعة', pages:12},
+  {id:'vespers', icon:'🌆', title:'صلاة الغروب', subtitle:'صلاة الساعة الحادية عشرة', pages:10},
+  {id:'compline', icon:'🌙', title:'صلاة النوم', subtitle:'صلاة الساعة الثانية عشرة', pages:13},
+  {id:'midnight', icon:'🌌', title:'صلاة نصف الليل', subtitle:'تسبحة نصف الليل', pages:35},
+  {id:'sattar', icon:'🕊️', title:'صلاة الستار', subtitle:'صلاة الستار', pages:21}
+];
+
+function todayISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function stripHtml(value) {
+  const div = document.createElement('div');
+  div.innerHTML = String(value ?? '');
+  return div.textContent || div.innerText || '';
+}
+
+function looksArabic(text) {
+  return /[\u0600-\u06FF]/.test(String(text || ''));
+}
+
+function formatAnyText(value) {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number') return stripHtml(value).trim();
+  if (Array.isArray(value)) return value.map(formatAnyText).filter(Boolean).join('\n\n');
+  if (typeof value === 'object') {
+    const preferred = ['ar','arabic','text_ar','arabicText','title_ar','description_ar','content_ar','name_ar'];
+    for (const key of preferred) {
+      if (value[key]) {
+        const t = formatAnyText(value[key]);
+        if (t && looksArabic(t)) return t;
+      }
+    }
+    const keys = Object.keys(value);
+    const pieces = [];
+    for (const key of keys) {
+      if (['id','date','gregorian_date','coptic_date','language','slug','url'].includes(key)) continue;
+      const t = formatAnyText(value[key]);
+      if (t && !pieces.includes(t)) pieces.push(t);
+    }
+    return pieces.join('\n\n');
+  }
+  return '';
+}
+
+async function fetchJson(urls) {
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {cache:'no-store'});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } catch (e) { lastError = e; }
+  }
+  throw lastError || new Error('فشل الاتصال');
+}
+
+function showOnlineError(containerId, message) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = `<div class="online-error"><div class="online-error-icon">📡</div><h3>تعذر تحميل المحتوى</h3><p>${escapeHtml(message)}</p><button type="button" onclick="location.reload()">إعادة المحاولة</button></div>`;
+}
+
+function openAgpeya() {
+  showScreen('agpeya-screen');
+  const list = document.getElementById('agpeya-list');
+  if (!list) return;
+  list.innerHTML = agpeyaPrayers.map((p, i) => `
+    <button class="prayer-card" type="button" onclick="openPrayer('${p.id}')">
+      <span class="prayer-index">${String(i + 1).padStart(2, '0')}</span>
+      <span class="prayer-icon">${p.icon}</span>
+      <span class="prayer-info"><strong>${p.title}</strong><small>${p.subtitle}</small></span>
+      <span class="prayer-arrow">‹</span>
+    </button>
+  `).join('');
+}
+
+async function fetchText(urls) {
+  let lastError = null;
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {cache:'no-store'});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.text();
+    } catch (e) { lastError = e; }
+  }
+  throw lastError || new Error('فشل الاتصال');
+}
+
+function htmlToReadableText(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  ['script','style','noscript','nav','header','footer','form'].forEach(sel => doc.querySelectorAll(sel).forEach(x => x.remove()));
+  return (doc.body?.innerText || doc.body?.textContent || '').replace(/\u00a0/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+}
+
+function cleanArabicLines(text) {
+  return String(text || '').split('\n').map(x => x.trim()).filter(x => x && !/^(محتويات|المحتوى|فهرس|إظهار|إخفاء|English|العربية|نسخ|حفظ|بحث)$/i.test(x));
+}
+
+function normalizePrayerText(text) {
+  return String(text || '')
+    .replace(/\r/g,'\n')
+    .replace(/[\u200e\u200f\u202a-\u202e]/g,'')
+    .replace(/\n{3,}/g,'\n\n')
+    .split('\n')
+    .map(x => x.trim())
+    .filter(x => x)
+    .join('\n');
+}
+
+function splitLocalPrayerSections(text, prayer) {
+  const lines = normalizePrayerText(text).split('\n').map(x => x.trim()).filter(Boolean);
+  const sections = [];
+  let current = null;
+  const headingPatterns = [
+    /^مقدمة كل ساعة:?$/,
+    /^الصلاة الربانية$/,
+    /^صلاة الشكر$/,
+    /^المزمور الخمسون$/,
+    /^بدء الصلاة$/,
+    /^بدء قانون الإيمان$/,
+    /^قانون الإيمان المقدس الأرثوذكسي$/,
+    /^قدوس قدوس قدوس$/,
+    /^التحليل(?: الكبير)?(?: لنصف الليل)?$/,
+    /^طلبة تصلى (?:آخر|أخر) كل ساعة$/,
+    /^القطع$/,
+    /^فصل من إنجيل/, 
+    /^من إنجيل/, 
+    /^(?:\(?\d+\)?\s*)?المزمور /,
+    /^مز\s*\d+\s*:/,
+    /^المزمور /,
+    /^\(إنجيل /,
+    /^الخدمة (الأولى|الثانية|الثالثة)$/,
+    /^الصلاة كاملة$/
+  ];
+  const isHeading = line => headingPatterns.some(r => r.test(line)) ||
+    (line.length < 55 && /^(صلاة|مقدمة|بدء|قانون|التحليل|البركة|القطع|الخدمة|فصل)/.test(line) && !/[،؛,:.!؟]$/.test(line));
+
+  for (const line of lines) {
+    if (isHeading(line)) {
+      if (current && current.text.trim()) sections.push(current);
+      current = {title: line.replace(/:$/,''), text:''};
+    } else if (current) {
+      current.text += (current.text ? '\n' : '') + line;
+    } else {
+      current = {title: prayer.title, text:line};
+    }
+  }
+  if (current && current.text.trim()) sections.push(current);
+
+  const grouped = [];
+  for (const sec of sections) {
+    const isPsalm = (/المزمور/.test(sec.title) || /^مز\s*\d+\s*:/.test(sec.title)) && !/الخمسون/.test(sec.title);
+    if (isPsalm) {
+      const last = grouped[grouped.length - 1];
+      if (last && last.title === 'المزامير') last.text += '\n\n' + sec.title + '\n' + sec.text;
+      else grouped.push({title:'المزامير', text:sec.title + '\n' + sec.text});
+    } else {
+      grouped.push(sec);
+    }
+  }
+  const cleaned = grouped.filter(x => x.text && x.text.trim());
+  if (cleaned.length) return cleaned;
+  return [{title:prayer.title, text:normalizePrayerText(text)}];
+}
+
+function splitPsalms(text) {
+  const lines = normalizePrayerText(text).split('\n').map(x => x.trim()).filter(Boolean);
+  const out = [];
+  let current = null;
+  const heading = /^(?:\(\s*\d+\s*\)\s*)?(?:المزمور\s+(.+)|مز\s*(\d+)\s*:\s*(.*))$/;
+  for (const line of lines) {
+    const m = line.match(heading);
+    if (m && line.length < 100) {
+      if (current && current.text.trim()) out.push(current);
+      let title = line.replace(/^\(\s*\d+\s*\)\s*/, '');
+      if (/^مز\s*\d+\s*:/.test(title)) title = title.replace(/^مز\s*(\d+)\s*:\s*(.*)$/, 'المزمور $1: $2');
+      current = { title, text: '' };
+    } else if (current) {
+      current.text += (current.text ? '\n' : '') + line;
+    }
+  }
+  if (current && current.text.trim()) out.push(current);
+  return out;
+}
+
+function renderPsalmPart(part) {
+  const view = document.getElementById('prayer-part-view');
+  if (!view) return;
+  const psalms = splitPsalms(part.text);
+  window.__currentPsalms = psalms;
+  window.__selectedPsalm = -1;
+  view.classList.remove('prayer-part-empty');
+  if (!psalms.length) {
+    view.innerHTML = `<div class="prayer-section-title">المزامير</div><div class="prayer-section-body">لا توجد مزامير منظمة في هذا الجزء.</div>`;
+    return;
+  }
+  view.innerHTML = `
+    <div class="prayer-section-title">المزامير</div>
+    <div class="psalm-picker-box">
+      <label for="psalm-select">اختر المزمور</label>
+      <select id="psalm-select" class="psalm-select">
+        ${psalms.map((p,i)=>`<option value="${i}">${escapeHtml(p.title)}</option>`).join('')}
+      </select>
+    </div>
+    <div id="selected-psalm-view" class="selected-psalm-view"></div>`;
+  const select = document.getElementById('psalm-select');
+  if (select) {
+    select.value = '0';
+    select.addEventListener('change', () => {
+      const index = Number(select.value);
+      if (Number.isInteger(index) && index >= 0) showPsalm(index);
+    });
+  }
+  showPsalm(0);
+}
+
+function showPsalm(index) {
+  const psalms = window.__currentPsalms || [];
+  const item = psalms[index];
+  if (!item) return;
+  window.__selectedPsalm = index;
+  const view = document.getElementById('selected-psalm-view');
+  if (!view) return;
+  view.innerHTML = `<div class="prayer-section-title">${escapeHtml(item.title)}</div><div class="prayer-section-body">${escapeHtml(item.text).replace(/\n/g,'<br>')}</div>`;
+}
+
+function renderLocalPrayerPart(part) {
+  const view = document.getElementById('prayer-part-view');
+  if (!view) return;
+  if (part && part.title === 'المزامير') {
+    renderPsalmPart(part);
+    return;
+  }
+  window.__currentPsalms = [];
+  window.__selectedPsalm = -1;
+  view.classList.remove('prayer-part-empty');
+  const body = escapeHtml(part.text).replace(/\n/g,'<br>');
+  view.innerHTML = `<div class="prayer-section-title">${escapeHtml(part.title)}</div><div class="prayer-section-body">${body}</div>`;
+}
+
+function renderLocalPrayer(prayer) {
+  const root = document.getElementById('prayer-content');
+  if (!root) return;
+  const raw = (window.AGPEYA_TEXT && window.AGPEYA_TEXT[prayer.id]) ? window.AGPEYA_TEXT[prayer.id] : '';
+  const parts = raw.trim() ? splitLocalPrayerSections(raw, prayer) : [{title: prayer.title, text: 'تعذر العثور على نص هذه الصلاة داخل التطبيق.'}];
+  root.innerHTML = `
+    <div class="prayer-card-large online-prayer-card local-prayer-card">
+      <div class="prayer-big-icon">${prayer.icon}</div>
+      <h2>${escapeHtml(prayer.title)}</h2>
+      <p class="local-prayer-note">النص محفوظ داخل التطبيق ويعمل بدون إنترنت.</p>
+      <button type="button" class="prayer-selector-btn" onclick="togglePrayerPicker()" aria-expanded="false">
+        <span id="selected-prayer-label">${escapeHtml(parts[0]?.title || "أول جزء")}</span>
+        <span class="prayer-selector-arrow">⌄</span>
+      </button>
+      <div id="prayer-part-view" class="prayer-part-view prayer-part-empty"></div>
+    </div>
+    <div id="prayer-picker-overlay" class="prayer-picker-overlay" onclick="closePrayerPicker(event)" aria-hidden="true">
+      <div class="prayer-picker" role="dialog" aria-modal="true" aria-label="اختيار جزء الصلاة" onclick="event.stopPropagation()">
+        <div class="prayer-picker-head">
+          <strong>اختر جزء الصلاة</strong>
+          <button type="button" onclick="togglePrayerPicker()" aria-label="إغلاق">×</button>
+        </div>
+        <div class="prayer-choice-list" role="listbox">
+          ${parts.map((s,i) => `<button type="button" class="prayer-choice" role="option" onclick="showPrayerPart(${i})">${escapeHtml(s.title)}</button>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  window.__currentPrayer = prayer;
+  window.__currentPrayerParts = parts;
+  window.__selectedPrayerPart = -1;
+  if (parts.length) showPrayerPart(0);
+}
+function togglePrayerPicker() {
+  const overlay = document.getElementById('prayer-picker-overlay');
+  const button = document.querySelector('.prayer-selector-btn');
+  if (!overlay) return;
+  const opening = !overlay.classList.contains('show');
+  overlay.classList.toggle('show', opening);
+  overlay.setAttribute('aria-hidden', opening ? 'false' : 'true');
+  if (button) button.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  document.body.classList.toggle('prayer-picker-open', opening);
+}
+
+function closePrayerPicker(event) {
+  if (event && event.target && event.target.id !== 'prayer-picker-overlay') return;
+  const overlay = document.getElementById('prayer-picker-overlay');
+  const button = document.querySelector('.prayer-selector-btn');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden', 'true');
+  if (button) button.setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('prayer-picker-open');
+}
+
+function showPrayerPart(index) {
+  const items = window.__currentPrayerParts || [];
+  const item = items[index];
+  if (!item) return;
+  const label = document.getElementById('selected-prayer-label');
+  if (label) label.textContent = item.title;
+  window.__selectedPrayerPart = index;
+  renderLocalPrayerPart(item);
+  closePrayerPicker();
+  const view = document.getElementById('prayer-part-view');
+  if (view) view.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function openPrayer(id) {
+  const prayer = agpeyaPrayers.find(p => p.id === id) || agpeyaPrayers[0];
+  document.getElementById('prayer-title').textContent = prayer.title;
+  showScreen('prayer-screen');
+  renderLocalPrayer(prayer);
+}
+
+function copticTodayLabel(dateISO) {
+  const d = new Date(dateISO + 'T12:00:00');
+  const sep11 = new Date(d.getFullYear(), 8, 11, 12);
+  if (d >= sep11 && d < new Date(d.getFullYear(), 9, 10, 12)) {
+    const day = Math.floor((d - sep11) / 86400000) + 1;
+    const copticYear = d.getFullYear() - 283;
+    return `${day} توت ${copticYear} للشهداء`;
+  }
+  return '';
+}
+
+async function openKatameros() {
+  showScreen('katameros-screen');
+  const date = todayISO();
+  const copticLabel = copticTodayLabel(date);
+  document.getElementById('katameros-date').textContent = copticLabel || 'قراءات اليوم';
+  document.getElementById('katameros-content').innerHTML = '<div class="loading-card">جاري تحميل القطمارس الحقيقي بالعربية…</div>';
+
+  const day = date.slice(8,10), month = date.slice(5,7), year = date.slice(0,4);
+  const sources = [
+    `https://r.jina.ai/https://www.ayakolyoum.com/public/katamaros?date=${date}`,
+    `https://www.ayakolyoum.com/public/katamaros?date=${date}`,
+    `https://r.jina.ai/https://www.copticchurch.net/readings/ar?g_day=${day}&g_month=${month}&g_year=${year}`,
+    `https://www.copticchurch.net/readings/ar?g_day=${day}&g_month=${month}&g_year=${year}`,
+    `https://r.jina.ai/https://st-takla.org/zJ/index.php/component/katamaros/?dbl=ar&iday=${day}&imonth=${month}&iyear=${year}&view=reading-arabic`,
+    `https://st-takla.org/zJ/index.php/component/katamaros/?dbl=ar&iday=${day}&imonth=${month}&iyear=${year}&view=reading-arabic`
+  ];
+
+  for (const url of sources) {
+    try {
+      const html = await fetchText([url]);
+      if (renderKatamerosArabicHtml(html)) return;
+    } catch (e) { console.warn('Katameros source failed', url, e); }
+  }
+
+  try {
+    const data = await fetchJson([
+      `${COPTIC_API}/readings/${date}?detailed=true&lang=ar`,
+      `${KATAMEROS_API}/readings/gregorian/${date.split('-').reverse().join('-')}?languageId=3&bibleId=3`
+    ]);
+    renderKatameros(data);
+  } catch (e) {
+    showOnlineError('katameros-content', 'تعذر تحميل قراءات القطمارس بالعربية من المصادر المتاحة.');
+  }
+}
+
+function normalizeReadingLabel(t) {
+  return String(t || '')
+    .replace(/[\u200e\u200f\u202a-\u202e]/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
+    .replace(/^مزمور\s+$/,'مزمور')
+    .replace(/^مزمر\b/,'مزمور')
+    .replace(/^الابركسيس$/,'الإبركسيس');
+}
+
+function katamerosStructuredParts(lines) {
+  const clean = lines.map(x => normalizeReadingLabel(x)).filter(Boolean);
+  const labels = [
+    'العشية','باكر','القداس','القداس الإلهي',
+    'مزمور','المزمور','إنجيل','الإنجيل',
+    'مزمور العشية','إنجيل العشية','مزمور باكر','إنجيل باكر',
+    'مقدمة العشية','مقدمة باكر','مقدمة القداس','مقدمة و مزمور','مقدمة و إنجيل',
+    'البولس','الكاثوليكون','الإبركسيس','الابركسيس','مزمور القداس','إنجيل القداس'
+  ];
+  const isLabel = t => labels.includes(t) || /^(مقدمة|مزمور|الإنجيل|إنجيل|البولس|الكاثوليكون|الإبركسيس|الابركسيس)/.test(t);
+  const parts=[];
+  let current=null;
+  const push=()=>{ if(current && current.text.trim().length>1) parts.push(current); current=null; };
+  const titleMap = {
+    'مزمور العشية':'مزمور العشية','إنجيل العشية':'إنجيل العشية','الإنجيل العشية':'إنجيل العشية',
+    'مزمور باكر':'مزمور باكر','إنجيل باكر':'إنجيل باكر','الإنجيل باكر':'إنجيل باكر',
+    'مزمور القداس':'مزمور القداس','إنجيل القداس':'إنجيل القداس',
+    'البولس':'البولس','الكاثوليكون':'الكاثوليكون','الإبركسيس':'الإبركسيس','الابركسيس':'الإبركسيس',
+    'مقدمة العشية':'مقدمة العشية','مقدمة باكر':'مقدمة باكر','مقدمة القداس':'مقدمة القداس'
+  };
+  let section='';
+  for (let i=0;i<clean.length;i++) {
+    const line=clean[i];
+    if (line==='العشية') { push(); section='vespers'; continue; }
+    if (line==='باكر') { push(); section='matins'; continue; }
+    if (line==='القداس' || line==='القداس الإلهي') { push(); section='liturgy'; continue; }
+
+    let title=titleMap[line];
+    if (!title && section==='vespers' && (line==='مزمور'||line==='المزمور')) title='مزمور العشية';
+    if (!title && section==='vespers' && (line==='إنجيل'||line==='الإنجيل')) title='إنجيل العشية';
+    if (!title && section==='matins' && (line==='مزمور'||line==='المزمور')) title='مزمور باكر';
+    if (!title && section==='matins' && (line==='إنجيل'||line==='الإنجيل')) title='إنجيل باكر';
+    if (!title && section==='liturgy' && (line==='مزمور'||line==='المزمور')) title='مزمور القداس';
+    if (!title && section==='liturgy' && (line==='إنجيل'||line==='الإنجيل')) title='إنجيل القداس';
+
+    if (title) {
+      push();
+      current={title,text:''};
+      continue;
+    }
+
+    if (!current && section) {
+      const introTitle = section==='vespers'?'مقدمة العشية':section==='matins'?'مقدمة باكر':'مقدمة القداس';
+      current={title:introTitle,text:''};
+    }
+    if (current) current.text += (current.text?'\n':'') + line;
+  }
+  push();
+
+  if (!parts.some(p=>p.title==='البولس') && !parts.some(p=>p.title==='الكاثوليكون') && !parts.some(p=>p.title==='الإبركسيس')) {
+    let current2=null;
+    for (const line of clean) {
+      const hit=['البولس','الكاثوليكون','الإبركسيس','الابركسيس','مزمور القداس','إنجيل القداس'].find(x=>line===x);
+      if (hit) { if(current2&&current2.text.trim()) parts.push(current2); current2={title:titleMap[hit]||hit,text:''}; }
+      else if(current2) current2.text += (current2.text?'\n':'')+line;
+    }
+    if(current2&&current2.text.trim()) parts.push(current2);
+  }
+
+  const seen=new Set();
+  return parts.filter(p=>p.text && looksArabic(p.text)).filter(p=>{
+    const key=p.title+'|'+p.text.slice(0,120);
+    if(seen.has(key)) return false; seen.add(key); return true;
+  });
+}
+
+function katamerosLegacyParts(lines) {
+  const clean=lines.map(x=>String(x||'').replace(/\s+/g,' ').trim()).filter(Boolean);
+  const aliases={
+    'مزمور العشية':'مزمور العشية','إنجيل العشية':'إنجيل العشية','الإنجيل العشية':'إنجيل العشية',
+    'مزمور باكر':'مزمور باكر','إنجيل باكر':'إنجيل باكر','الإنجيل باكر':'إنجيل باكر',
+    'البولس':'البولس','الكاثوليكون':'الكاثوليكون','الإبركسيس':'الإبركسيس','الابركسيس':'الإبركسيس',
+    'مزمور القداس':'مزمور القداس','إنجيل القداس':'إنجيل القداس'
+  };
+  const titles=Object.keys(aliases);
+  const out=[]; let current=null;
+  for(const line of clean){
+    const hit=titles.find(x=>line===x);
+    if(hit){ if(current&&current.text.trim()) out.push(current); current={title:aliases[hit],text:''}; }
+    else if(current && !/^(القطمارس|قراءات اليوم|نسخ القراءة|نسخ الكل|English|العربية|التاريخ|المناسبة)$/i.test(line)) current.text+=(current.text?'\n':'')+line;
+  }
+  if(current&&current.text.trim()) out.push(current);
+  return out.filter(p=>p.text.length>1&&looksArabic(p.text));
+}
+
+function renderKatamerosParts(parts) {
+  const root = document.getElementById('katameros-content');
+  if (!root || !parts.length) return false;
+  const order=['مقدمة العشية','مزمور العشية','إنجيل العشية','مقدمة باكر','مزمور باكر','إنجيل باكر','البولس','الكاثوليكون','الإبركسيس','مقدمة القداس','مزمور القداس','إنجيل القداس'];
+  const items=parts.map((p,i)=>({...p})).sort((a,b)=>{
+    const ai=order.indexOf(a.title), bi=order.indexOf(b.title);
+    return (ai<0?999:ai)-(bi<0?999:bi);
+  }).map((p,i)=>({...p,id:`katameros-part-${i}`}));
+  if (!items.length) return false;
+  root.innerHTML=`
+    <div class="daily-selector-wrap">
+      <button type="button" class="daily-selector-btn" onclick="toggleDailyPicker('katameros')" aria-expanded="false">
+        <span id="katameros-selected-label">${escapeHtml(items[0].title)}</span><span>⌄</span>
+      </button>
+    </div>
+    <div id="katameros-part-view" class="daily-selected-view"></div>
+    <div id="katameros-picker" class="daily-picker-overlay" onclick="closeDailyPicker('katameros',event)" aria-hidden="true">
+      <div class="daily-picker" onclick="event.stopPropagation()">
+        <div class="daily-picker-head"><strong>اختر جزء القطمارس</strong><button type="button" onclick="toggleDailyPicker('katameros')">×</button></div>
+        <div class="daily-choice-list">${items.map((p,i)=>`<button type="button" class="daily-choice" onclick="showKatamerosPart(${i})"><span>${escapeHtml(p.title)}</span></button>`).join('')}</div>
+      </div>
+    </div>`;
+  window.__katamerosParts=items;
+  window.__selectedKatamerosPart=0;
+  showKatamerosPart(0,false);
+  return true;
+}
+
+function showKatamerosPart(index,smooth=true) {
+  const parts=window.__katamerosParts||[];
+  if(!parts[index]) return;
+  window.__selectedKatamerosPart=index;
+  const label=document.getElementById('katameros-selected-label');
+  const view=document.getElementById('katameros-part-view');
+  if(label) label.textContent=parts[index].title;
+  if(view) view.innerHTML=`<section class="reading-card"><div class="reading-label">${escapeHtml(parts[index].title)}</div><div class="reading-text">${escapeHtml(parts[index].text).replace(/\n/g,'<br><br>')}</div></section>`;
+  closeDailyPicker('katameros');
+  if(smooth && view) view.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function toggleDailyPicker(type) {
+  const id=type==='katameros'?'katameros-picker':'synaxarium-picker';
+  const overlay=document.getElementById(id);
+  if(!overlay) return;
+  const open=!overlay.classList.contains('show');
+  overlay.classList.toggle('show',open);
+  overlay.setAttribute('aria-hidden',String(!open));
+  document.body.classList.toggle('daily-picker-open',open);
+}
+function closeDailyPicker(type,event) {
+  if(event&&event.target!==event.currentTarget) return;
+  const id=type==='katameros'?'katameros-picker':'synaxarium-picker';
+  const overlay=document.getElementById(id);
+  if(overlay){overlay.classList.remove('show');overlay.setAttribute('aria-hidden','true');}
+  document.body.classList.remove('daily-picker-open');
+}
+
+function renderKatamerosArabicHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  ['script','style','noscript','nav','header','footer','form'].forEach(sel =>
+    doc.querySelectorAll(sel).forEach(x => x.remove())
+  );
+  const root = doc.querySelector('main') || doc.querySelector('article') || doc.body;
+  if (!root) return false;
+
+  const raw = (root.innerText || root.textContent || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u200e\u200f\u202a-\u202e]/g, '');
+  const lines = raw.split(/\n+/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+
+  const aliases = {
+    'مزمور العشية':'مزمور العشية', 'إنجيل العشية':'إنجيل العشية', 'الإنجيل العشية':'إنجيل العشية',
+    'مزمور باكر':'مزمور باكر', 'إنجيل باكر':'إنجيل باكر', 'الإنجيل باكر':'إنجيل باكر',
+    'مزمور القداس':'مزمور القداس', 'إنجيل القداس':'إنجيل القداس', 'الإنجيل القداس':'إنجيل القداس',
+    'البولس':'البولس', 'الكاثوليكون':'الكاثوليكون',
+    'الإبركسيس':'الإبركسيس', 'الابركسيس':'الإبركسيس'
+  };
+  const parts = [];
+  let service = '';
+  let current = null;
+  const serviceName = s => {
+    if (s === 'العشية') return 'vespers';
+    if (s === 'باكر') return 'matins';
+    if (s === 'القداس' || s === 'القداس الإلهي' || s === 'قراءات القداس') return 'liturgy';
+    return service;
+  };
+  const titleFor = (name) => {
+    if (name === 'مزمور' || name === 'المزمور') return service === 'vespers' ? 'مزمور العشية' : service === 'matins' ? 'مزمور باكر' : 'مزمور القداس';
+    if (name === 'إنجيل' || name === 'الإنجيل') return service === 'vespers' ? 'إنجيل العشية' : service === 'matins' ? 'إنجيل باكر' : 'إنجيل القداس';
+    return aliases[name] || name;
+  };
+  const isHeading = line => {
+    if (aliases[line] || ['العشية','باكر','القداس','القداس الإلهي','قراءات القداس','مزمور','المزمور','إنجيل','الإنجيل'].includes(line)) return true;
+    return false;
+  };
+  const pushCurrent = () => {
+    if (!current || current.text.trim().length < 2 || !looksArabic(current.text)) { current = null; return; }
+    const lines2 = current.text.split('\n').map(x => x.trim()).filter(Boolean);
+    if (/^(مزمور|إنجيل)/.test(current.title) && lines2.length >= 2) {
+      const refIndex = lines2.findIndex((x,i) => i > 0 && /(?:^|\s)(?:[1-3]\s*)?[\p{L}]+\s*\(?\d+\s*[:：]\s*\d+/u.test(x));
+      if (refIndex > 0) {
+        const intro = lines2.slice(0, refIndex).join('\n');
+        const body = lines2.slice(refIndex).join('\n');
+        if (intro) {
+          const introTitle = current.title === 'مزمور العشية' ? 'مقدمة العشية' :
+            current.title === 'مزمور باكر' ? 'مقدمة باكر' :
+            current.title === 'مزمور القداس' ? 'مقدمة القداس' :
+            current.title === 'إنجيل العشية' ? 'مقدمة العشية' :
+            current.title === 'إنجيل باكر' ? 'مقدمة باكر' : 'مقدمة القداس';
+          parts.push({title:introTitle, text:intro});
+        }
+        current.text = body;
+      }
+    }
+    if (current.text.trim()) parts.push({title:current.title, text:current.text.trim()});
+    current = null;
+  };
+
+  for (const line of lines) {
+    if (line === 'العشية' || line === 'باكر' || line === 'القداس' || line === 'القداس الإلهي' || line === 'قراءات القداس') {
+      pushCurrent();
+      service = serviceName(line);
+      continue;
+    }
+    if (isHeading(line)) {
+      pushCurrent();
+      current = {title:titleFor(line), text:''};
+      continue;
+    }
+    const inline = line.match(/^(مزمور العشية|إنجيل العشية|مزمور باكر|إنجيل باكر|البولس|الكاثوليكون|الإبركسيس|الابركسيس|مزمور القداس|إنجيل القداس)\s*[:：-]?\s*(.*)$/);
+    if (inline) {
+      pushCurrent();
+      current = {title:aliases[inline[1]] || inline[1], text:inline[2] || ''};
+      continue;
+    }
+    if (current) {
+      if (/^(نسخ القراءة|نسخ الكل|مصدر القراءة|العربية|English|القطمارس|قراءات اليوم|التاريخ|المناسبة)$/i.test(line)) continue;
+      current.text += (current.text ? '\n' : '') + line;
+    }
+  }
+  pushCurrent();
+
+  const seen = new Set();
+  const clean = parts.filter(p => {
+    const text = String(p.text || '').trim();
+    const key = p.title + '|' + text;
+    if (!text || text.length < 2 || seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+
+  if (!clean.length) {
+    const fallback = katamerosStructuredParts(lines);
+    if (fallback.length) return renderKatamerosParts(fallback);
+    return false;
+  }
+  return renderKatamerosParts(clean);
+}
+
+const readingNamesAr = {
+  psalm:'المزمور', gospel:'الإنجيل', pauline:'البولس', catholicon:'الكاثوليكون', praxis:'الإبركسيس', acts:'الإبركسيس', liturgy:'القداس', matins:'باكر', vespers:'العشية', readings:'القراءات', epistle:'الرسالة'
+};
+
+function renderKatameros(data) {
+  const root=document.getElementById('katameros-content');
+  const parts=[]; const used=new Set();
+  function add(title,value){
+    const text=stripHtml(value).trim();
+    if(!text||text.length<2||!looksArabic(text)) return;
+    const key=title+'|'+text;
+    if(used.has(key)) return;
+    used.add(key); parts.push({title:title||'قراءة',text});
+  }
+  function walk(v,key='',section=''){
+    if(v==null) return;
+    const k=String(key||'').toLowerCase();
+    let title=readingNamesAr[k]||(looksArabic(key)?key:'');
+    if(/pauline|بولس/.test(k)) title='البولس';
+    else if(/cath|كاثولي/.test(k)) title='الكاثوليكون';
+    else if(/praxis|acts|ابركسيس|إبركسيس/.test(k)) title='الإبركسيس';
+    else if(/psalm/.test(k)) title=section==='liturgy'?'مزمور القداس':section==='vespers'?'مزمور العشية':section==='matins'?'مزمور باكر':'المزمور';
+    else if(/gospel/.test(k)) title=section==='liturgy'?'إنجيل القداس':section==='vespers'?'إنجيل العشية':section==='matins'?'إنجيل باكر':'الإنجيل';
+    if(typeof v==='string'||typeof v==='number'){ add(title,v); return; }
+    if(Array.isArray(v)){v.forEach(x=>walk(x,key,section));return;}
+    if(typeof v==='object') Object.entries(v).forEach(([k2,val])=>{
+      const sec=/vespers|عشية/.test(String(k2).toLowerCase())?'vespers':/matins|باكر/.test(String(k2).toLowerCase())?'matins':/liturgy|قداس/.test(String(k2).toLowerCase())?'liturgy':section;
+      walk(val,k2,sec);
+    });
+  }
+  walk(data);
+  if(!parts.length){root.innerHTML='<div class="online-error"><h3>لم تظهر قراءات اليوم</h3><p>تمت تجربة المصادر العربية المتاحة للقطمارس.</p></div>';return;}
+  renderKatamerosParts(parts);
+}
+
+async function openSynaxarium() {
+  showScreen('synaxarium-screen');
+  const date=todayISO();
+  document.getElementById('synaxarium-date').textContent=`سنكسار اليوم • ${date}`;
+  document.getElementById('synaxarium-content').innerHTML='<div class="loading-card">جاري تحميل سنكسار اليوم بالعربية…</div>';
+  const day=date.slice(8,10), month=date.slice(5,7), year=date.slice(0,4);
+  const sources=[
+    `https://r.jina.ai/https://www.elkanisa.com/coptic/synaxarium/${date}`,
+    `https://www.elkanisa.com/coptic/synaxarium/${date}`,
+    `https://r.jina.ai/https://copticorthodox.church/synaxarion/`,
+    `https://copticorthodox.church/synaxarion/`,
+    `https://r.jina.ai/https://www.copticchurch.net/synaxarium/all/ar`
+  ];
+  for(const url of sources){
+    try{
+      const html=await fetchText([url]);
+      if(/copticorthodox\.church\/synaxarion\/$/.test(url) || /copticorthodox\.church\/synaxarion\/?$/.test(url)) {
+        if(await renderSynaxariumIndexHtml(html,date)) return;
+      } else if(renderSynaxariumArabicHtml(html,date)) return;
+    } catch(e){ console.warn('Synaxarium source failed',url,e); }
+  }
+  try{
+    const data=await fetchJson([`${COPTIC_API}/synaxarium/${date}?lang=ar`,`https://synaxarium-api.vercel.app/synaxarium?date_gregorian=${date}`]);
+    renderSynaxarium(data);
+  }catch(e){showOnlineError('synaxarium-content','تعذر تحميل سنكسار اليوم من المصادر المتاحة حالياً.');}
+}
+
+function renderSynaxariumChoices(parts) {
+  const root=document.getElementById('synaxarium-content');
+  const items=parts.filter(p=>p&&p.text&&p.text.trim()).map((p,i)=>({...p,id:`synax-${i}`}));
+  if(!items.length) return false;
+  if(items.length===1){
+    root.innerHTML=`<article class="synaxarium-card synax-section"><div class="synax-section-title">${escapeHtml(items[0].title)}</div><div class="synax-section-body">${escapeHtml(items[0].text).replace(/\n/g,'<br><br>')}</div></article>`;
+    window.__synaxParts=items; window.__selectedSynaxPart=0; return true;
+  }
+  root.innerHTML=`
+    <div class="daily-selector-wrap">
+      <button type="button" class="daily-selector-btn" onclick="toggleDailyPicker('synaxarium')" aria-expanded="false">
+        <span id="synaxarium-selected-label">${escapeHtml(items[0].title)}</span><span>⌄</span>
+      </button>
+    </div>
+    <div id="synaxarium-part-view" class="daily-selected-view"></div>
+    <div id="synaxarium-picker" class="daily-picker-overlay" onclick="closeDailyPicker('synaxarium',event)" aria-hidden="true">
+      <div class="daily-picker" onclick="event.stopPropagation()">
+        <div class="daily-picker-head"><strong>اختر الذكرى</strong><button type="button" onclick="toggleDailyPicker('synaxarium')">×</button></div>
+        <div class="daily-choice-list">${items.map((p,i)=>`<button type="button" class="daily-choice" onclick="showSynaxariumPart(${i})"><span>${escapeHtml(p.title)}</span></button>`).join('')}</div>
+      </div>
+    </div>`;
+  window.__synaxParts=items; window.__selectedSynaxPart=0; showSynaxariumPart(0,false); return true;
+}
+function showSynaxariumPart(index,smooth=true){
+  const parts=window.__synaxParts||[]; if(!parts[index]) return;
+  window.__selectedSynaxPart=index;
+  const label=document.getElementById('synaxarium-selected-label'), view=document.getElementById('synaxarium-part-view');
+  if(label) label.textContent=parts[index].title;
+  if(view) view.innerHTML=`<article class="synaxarium-card synax-section"><div class="synax-section-title">${escapeHtml(parts[index].title)}</div><div class="synax-section-body">${escapeHtml(parts[index].text).replace(/\n/g,'<br><br>')}</div></article>`;
+  closeDailyPicker('synaxarium'); if(smooth&&view) view.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function renderSynaxariumIndexHtml(html,date){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const links=Array.from(doc.querySelectorAll('a[href]'));
+  const dateParts=date.split('-');
+  const year=dateParts[0], month=dateParts[1], day=String(Number(dateParts[2]));
+  const candidates=links.filter(a=>{
+    const text=(a.innerText||a.textContent||'').replace(/\s+/g,' ').trim();
+    const href=a.getAttribute('href')||'';
+    return text.includes(year) && (text.includes(day+' ') || text.includes(' '+day)) && /synaxarion/i.test(href);
+  });
+  for(const a of candidates.slice(0,3)){
+    let href=a.href || a.getAttribute('href');
+    if(!href) continue;
+    try{
+      const proxied=/^https?:\/\//.test(href) ? `https://r.jina.ai/${href}` : `https://r.jina.ai/https://copticorthodox.church${href}`;
+      const article=await fetchText([proxied,href]);
+      if(renderSynaxariumArabicHtml(article,date)) return true;
+    }catch(e){ console.warn('Synaxarium article link failed',e); }
+  }
+  return false;
+}
+
+function renderSynaxariumArabicHtml(html,date){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  ['script','style','noscript','nav','header','footer','form'].forEach(sel=>doc.querySelectorAll(sel).forEach(x=>x.remove()));
+  const root=doc.querySelector('main')||doc.querySelector('article')||doc.body;
+  const nodes=root.querySelectorAll('h1,h2,h3,h4,h5,p,li,blockquote');
+  const sections=[]; let current=null;
+  const skip=/^(السنكسار اليومي|مصدر السنكسار|English|العربية|بحث|اليوم السابق|اليوم التالي|مشاركة|نسخ|التاريخ|المناسبة)$/i;
+  nodes.forEach(n=>{
+    const t=(n.innerText||n.textContent||'').replace(/\s+/g,' ').trim();
+    if(!t||!looksArabic(t)||skip.test(t)) return;
+    const heading=/^h[1-5]$/i.test(n.tagName);
+    if(heading&&t.length<220){if(current&&current.text.trim()) sections.push(current);current={title:t,text:''};}
+    else if(current) current.text+=(current.text?'\n':'')+t;
+  });
+  if(current&&current.text.trim()) sections.push(current);
+  let clean=sections.filter(s=>s.text.trim().length>1);
+  if(!clean.length){
+    const lines=(root.innerText||root.textContent||'').split(/\n+/).map(x=>x.trim()).filter(x=>x&&looksArabic(x)&&!skip.test(x));
+    if(lines.length) clean=[{title:'تذكارات اليوم',text:lines.join('\n')}];
+  }
+  return renderSynaxariumChoices(clean);
+}
+
+function renderSynaxarium(data){
+  const copticDate=data?.coptic_date||data?.copticDate||data?.copticDateString;
+  const feasts=data?.feasts||data?.celebrations||data?.commemorations||data?.saints||[];
+  let description=stripHtml(data?.description||data?.content||data?.text||data?.body||'').trim();
+  const feastList=Array.isArray(feasts)?feasts:(feasts?[feasts]:[]);
+  const parts=feastList.map((x,i)=>({title:formatAnyText(x)||`ذكرى ${i+1}`,text:formatAnyText(x)||''})).filter(x=>x.text);
+  if(description&&!parts.length) parts.push({title:copticDate?formatAnyText(copticDate):'تذكارات اليوم',text:description});
+  if(!parts.length) return showOnlineError('synaxarium-content','تعذر تحميل سنكسار اليوم من المصادر المتاحة حالياً.');
+  renderSynaxariumChoices(parts);
+}
+
 async function loadBibleData() {
-  // نحمّل البيانات المحلية فقط كخطة احتياطية.
-  // عند فتح أي إصحاح سنحاول أولاً جلب النص المنظم من الإنترنت.
   try {
     const response = await fetch('data/bible.txt', { cache: 'no-cache' });
     if (response.ok) {
@@ -82,15 +864,6 @@ function normalizeArabicText(text) {
     .trim();
 }
 
-/*
- * eBible.org يعرض كل إصحاح في ملف مستقل مثل GEN01.htm.
- * نقرأ النص من الصفحة ونستخرج رقم الآية + نصها، بدلاً من أخذ
- * النص الخام للصفحة بالكامل، حتى لا تظهر العناوين والقوائم وسط الآيات.
- */
-// ============ مصادر الإنترنت + التخزين المحلي ============
-// المصدر الأول: eBible HTML
-// المصدر الثاني: Bible SuperSearch API (SVD العربي)
-// بعد نجاح أي مصدر يتم حفظ الإصحاح في localStorage ليعمل لاحقاً حتى بدون اتصال.
 const BSS_BOOK_NAMES = {
   'GEN':'Gen','EXO':'Ex','LEV':'Lev','NUM':'Num','DEU':'Deut','JOS':'Josh','JDG':'Judg','RUT':'Ruth',
   '1SA':'1 Sam','2SA':'2 Sam','1KI':'1 Kgs','2KI':'2 Kgs','1CH':'1 Chr','2CH':'2 Chr','EZR':'Ezra','NEH':'Neh',
@@ -127,7 +900,6 @@ function saveCachedChapter(bookName, chapterNum, verses, source) {
     localStorage.setItem(`bible_chapter_source_${(typeof bibleBookCodes !== 'undefined' && bibleBookCodes[bookName]) || bookName}_${Number(chapterNum)}`, source);
     localStorage.setItem('bible_last_generated', JSON.stringify({ bookName, chapterNum:Number(chapterNum), source, time:Date.now() }));
   } catch (e) {
-    // لو امتلأت مساحة localStorage لا نفشل عرض الإصحاح.
     console.warn('تعذر حفظ الإصحاح محلياً:', e);
   }
 }
@@ -146,15 +918,9 @@ async function fetchFromBibleSuperSearch(bookName, chapterNum) {
   if (!shortName) throw new Error(`لا يوجد اسم API للسفر: ${bookName}`);
 
   const reference = `${shortName} ${Number(chapterNum)}`;
-  const base = 'https://api.biblesupersearch.com/api';
-  const params = new URLSearchParams({
-    bible: 'svd',
-    reference,
-    data_format: 'minimal',
-    page_all: 'true'
-  });
+  const url = `https://bethie.api.biblesupersearch.com/api?bible=svd&reference=${encodeURIComponent(reference)}&data_format=minimal&page_all=true`;
 
-  const response = await fetch(`${base}?${params.toString()}`, {
+  const response = await fetch(url, {
     method: 'GET',
     mode: 'cors',
     cache: 'no-store',
@@ -168,50 +934,6 @@ async function fetchFromBibleSuperSearch(bookName, chapterNum) {
   const verses = normalizeApiVerses(data?.results?.svd);
   if (!verses.length) throw new Error('المصدر الثاني لم يُرجع آيات');
   return verses;
-}
-
-// احتياط إضافي لـ WebView/file:// إذا منع fetch طلب JSON.
-function fetchBibleSuperSearchJSONP(bookName, chapterNum, timeoutMs = 10000) {
-  return new Promise((resolve, reject) => {
-    const code = bibleBookCodes?.[bookName];
-    const shortName = code ? BSS_BOOK_NAMES[code] : null;
-    if (!shortName) return reject(new Error(`لا يوجد اسم API للسفر: ${bookName}`));
-
-    const callbackName = `bssCallback_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const script = document.createElement('script');
-    const params = new URLSearchParams({
-      bible: 'svd',
-      reference: `${shortName} ${Number(chapterNum)}`,
-      data_format: 'minimal',
-      page_all: 'true',
-      callback: callbackName
-    });
-    script.src = `https://api.biblesupersearch.com/api?${params.toString()}`;
-    script.async = true;
-
-    const cleanup = () => {
-      clearTimeout(timer);
-      try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
-      script.remove();
-    };
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('انتهت مهلة مصدر Bible SuperSearch'));
-    }, timeoutMs);
-
-    window[callbackName] = data => {
-      cleanup();
-      if (data?.errors?.length) return reject(new Error(data.errors.join('، ')));
-      const verses = normalizeApiVerses(data?.results?.svd);
-      if (!verses.length) return reject(new Error('المصدر الثاني لم يُرجع آيات'));
-      resolve(verses);
-    };
-    script.onerror = () => {
-      cleanup();
-      reject(new Error('تعذر الاتصال بمصدر Bible SuperSearch'));
-    };
-    document.head.appendChild(script);
-  });
 }
 
 async function fetchFromEBible(bookName, chapterNum) {
@@ -229,75 +951,44 @@ async function fetchFromEBible(bookName, chapterNum) {
 
   const html = await response.text();
   if (!html || html.length < 100) throw new Error('صفحة eBible فارغة');
-  return parseEBibleChapterHTML(html);
-}
-
-function parseEBibleChapterHTML(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const root = doc.querySelector('main, article, #main') || doc.body;
   root.querySelectorAll('script,style,noscript,nav,header,footer,form,aside,.navbar,.menu').forEach(el => el.remove());
 
-  // eBible يعرض أرقام الآيات داخل النص، أحياناً بالأرقام العربية وأحياناً الغربية.
-  // نبحث عن سلسلة 1،2،3... كاملة ونبدأ من أول رقم 1 الذي يتبعه رقم 2.
-  const arabicMap = '٠١٢٣٤٥٦٧٨٩';
-  const convertDigits = value => String(value)
-    .replace(/[٠-٩]/g, d => String(arabicMap.indexOf(d)))
+  let text = normalizeArabicText(root.textContent || '')
+    .replace(/[٠-٩]/g, d => String(arabicDigits.indexOf(d)))
     .replace(/[۰-۹]/g, d => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
 
-  const text = String(root.textContent || '')
-    .replace(/\uFEFF/g, '')
-    .replace(/\u00A0/g, ' ')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{2,}/g, '\n')
-    .trim();
-
-  const re = /(?:^|\s)([0-9٠-٩۰-۹]{1,3})(?=\s)/g;
-  const candidates = [];
+  const matches = [];
+  const re = /(?:^|\s)([0-9]{1,3})(?=\s)/g;
   let m;
   while ((m = re.exec(text))) {
-    const n = Number(convertDigits(m[1]));
-    if (n >= 1 && n <= 200) {
-      candidates.push({ number:n, start:m.index + (m[0].length - m[1].length), end:re.lastIndex });
-    }
+    const n = Number(m[1]);
+    if (n >= 1 && n <= 200) matches.push({number:n, index:m.index, end:re.lastIndex});
   }
 
-  // لا نأخذ رقم الإصحاح الموجود في عنوان الصفحة. اختر أول 1 ثم 2 ثم 3...
-  let first = -1;
-  for (let i = 0; i < candidates.length; i++) {
-    if (candidates[i].number !== 1) continue;
-    let ok = true;
-    for (let k = 1; k <= 4; k++) {
-      if (!candidates[i + k] || candidates[i + k].number !== k + 1) {
-        ok = false;
-        break;
-      }
+  const ordered = [];
+  let expected = 1;
+  for (const item of matches) {
+    if (item.number === expected) {
+      ordered.push(item);
+      expected++;
     }
-    if (ok) { first = i; break; }
   }
-  if (first < 0) throw new Error('تعذر تحديد بداية آيات eBible');
+  if (!ordered.length) throw new Error('تعذر استخراج آيات eBible');
 
   const verses = [];
-  for (let i = first; i < candidates.length; i++) {
-    const current = candidates[i];
-    if (current.number !== verses.length + 1) {
-      // تجاهل أي أرقام لاحقة ليست جزءاً من تسلسل الآيات.
-      if (verses.length > 0) break;
-      continue;
-    }
-    const next = candidates[i + 1];
-    const end = next ? next.start : text.length;
-    let verseText = text.slice(current.end, end)
-      .replace(/^\s*[|•·\-–—]+\s*/, '')
-      .trim();
-    if (verseText) verses.push({ number: current.number, text: normalizeArabicText(verseText) });
+  for (let i=0; i<ordered.length; i++) {
+    const start = ordered[i].end;
+    const end = i+1 < ordered.length ? ordered[i+1].index : text.length;
+    const verseText = normalizeArabicText(text.slice(start,end)).replace(/^[|•·\-–—]+\s*/, '');
+    if (verseText) verses.push({number:ordered[i].number, text:verseText});
   }
-
   if (!verses.length) throw new Error('تعذر استخراج نص eBible');
   return verses;
 }
 
 async function fetchRemoteChapter(bookName, chapterNum) {
-  // 1) لو الإصحاح اتولد قبل كده، نستخدم النسخة المحفوظة فوراً.
   const cached = readCachedChapter(bookName, chapterNum);
   if (cached?.length) {
     console.log(`📦 تم تحميل ${bookName} ${chapterNum} من الحفظ المحلي`);
@@ -305,9 +996,8 @@ async function fetchRemoteChapter(bookName, chapterNum) {
   }
 
   const sources = [
-    { name:'Bible SuperSearch', fn:() => fetchFromBibleSuperSearch(bookName, chapterNum) },
-    { name:'Bible SuperSearch JSONP', fn:() => fetchBibleSuperSearchJSONP(bookName, chapterNum) },
-    { name:'eBible', fn:() => fetchFromEBible(bookName, chapterNum) }
+    { name:'eBible', fn:() => fetchFromEBible(bookName, chapterNum) },
+    { name:'Bible SuperSearch', fn:() => fetchFromBibleSuperSearch(bookName, chapterNum) }
   ];
 
   let lastError = null;
@@ -330,11 +1020,9 @@ async function fetchRemoteChapter(bookName, chapterNum) {
 }
 
 async function getChapterVerses(bookName, chapterNum) {
-  // الإنترنت أولاً دائماً، لأن هذا هو المصدر الأساسي للنص.
   try {
     const remoteVerses = await fetchRemoteChapter(bookName, chapterNum);
 
-    // حفظ نسخة الجلسة بعد نجاح الإنترنت.
     if (!Array.isArray(bibleData)) bibleData = [];
     let targetBook = bibleData.find(b => b.name === bookName);
     if (!targetBook) {
@@ -347,36 +1035,24 @@ async function getChapterVerses(bookName, chapterNum) {
   } catch (remoteError) {
     console.warn('فشل المصدر الإنترنتي، سيتم استخدام النسخة المحلية كاحتياط:', remoteError);
 
-    // fallback محلي إذا كان الإنترنت غير متاح.
     const book = Array.isArray(bibleData)
       ? bibleData.find(b => b.name === bookName)
       : null;
 
     const localVerses = book?.chapters?.[chapterNum - 1];
     if (Array.isArray(localVerses) && localVerses.length) {
-      const verses = [];
-      let verseNo = 1;
-
-      for (const raw of localVerses) {
-        const line = normalizeArabicText(raw);
-        if (!line) continue;
-
-        // بعض النسخ المحلية تحتوي رقم الآية في بداية السطر، وبعضها لا.
-        const match = line.match(/^([0-9٠-٩۰-۹]{1,3})\s*(.*)$/);
-        if (match) {
-          const n = Number(fromArabicDigits(match[1]));
-          const txt = normalizeArabicText(match[2]);
-          if (n > 0 && txt) {
-            verses.push({ number: n, text: txt });
-            verseNo = n + 1;
-            continue;
-          }
-        }
-
-        verses.push({ number: verseNo++, text: line });
-      }
-
-      return verses.sort((a,b) => a.number - b.number);
+      return localVerses
+        .join(' ')
+        .split(/\s*(?=(?:[0-9٠-٩]+)\s*)/)
+        .map(v => v.trim())
+        .filter(Boolean)
+        .map((v, i) => {
+          const match = v.match(/^([0-9٠-٩]+)\s*(.*)$/);
+          return {
+            number: match ? Number(fromArabicDigits(match[1])) : i + 1,
+            text: match ? match[2].trim() : v
+          };
+        });
     }
 
     throw remoteError;
@@ -393,7 +1069,6 @@ function parseBibleText(text) {
     const line = rawLine.trim();
     if (!line) continue;
 
-    // يدعم # و ## حتى لو كان الملف يحتوي على BOM أو مسافات.
     if (/^#\s+/.test(line) && !/^##\s+/.test(line)) {
       const bookName = line.replace(/^#\s+/, '').trim();
       currentBook = { name: bookName, chapters: [] };
@@ -417,8 +1092,6 @@ function parseBibleText(text) {
   return books;
 }
 
-// ============ الأسفار ============
-// ============ توليد القوائم تلقائياً عند تحميل الموقع ============
 let generatedBibleNavigation = {
   old: [],
   new: [],
@@ -444,7 +1117,6 @@ function buildBibleNavigation() {
       Array.from({ length: book.chaptersCount }, (_, i) => i + 1);
   });
 
-  // تجهيز القوائم في الذاكرة قبل أي ضغط على الشاشة.
   renderTestamentBooks('old');
   renderTestamentBooks('new');
 
@@ -512,7 +1184,6 @@ function backToChapters() {
   openBook(currentBook, book ? book.chapters.length : (meta ? meta.length : 1));
 }
 
-// ============ عرض الإصحاح ============
 async function openChapter(bookName, chapterNum) {
   stopSpeaking();
   currentBook = bookName;
@@ -533,7 +1204,6 @@ async function openChapter(bookName, chapterNum) {
   try {
     const rawVerses = await getChapterVerses(bookName, chapterNum);
 
-    // توحيد شكل البيانات سواء جاءت من الإنترنت أو من النسخة المحلية.
     const verses = (rawVerses || [])
       .map((item, index) => {
         if (typeof item === 'string') {
@@ -599,7 +1269,6 @@ async function openChapter(bookName, chapterNum) {
     `;
   }
 }
-// ============ تجهيز بيانات الصوت ============
 function prepareAudioData(verses) {
   allVersesText = verses.map(v => v.trim()).filter(t => t.length > 0);
   const fullText = allVersesText.join(' . ');
@@ -636,15 +1305,11 @@ function updateAudioBar(current, total, status) {
   if (status) document.getElementById('audio-status').textContent = status;
 }
 
-// ============ القراءة الصوتية الخارجية ============
-// مصدر تسجيلات عربية بشرية حقيقية من Wordproject.
-// book number مطابق لترتيب الأسفار 1..66.
 const WORDPROJECT_AUDIO_BASES = [
   'https://www.wordproaudio.net/bibles/app/audio/16',
   'https://wordproaudio.net/bibles/app/audio/16'
 ];
 
-// أرقام WordProject ثابتة: متى=40، مرقس=41، لوقا=42، يوحنا=43 ...
 const WORDPROJECT_BOOK_NUMBERS = Object.fromEntries([
   ...(Array.isArray(oldTestament) ? oldTestament : []),
   ...(Array.isArray(newTestament) ? newTestament : [])
@@ -746,7 +1411,6 @@ async function speakVerses() {
     }
   }
 
-  // كحل أخير، استخدم قارئ الجهاز حتى لا يبقى الإصحاح بلا صوت.
   if ('speechSynthesis' in window) {
     const text = (window.currentVerses || []).join(' ');
     if (text) {
@@ -786,7 +1450,6 @@ function stopSpeaking() {
   clearHighlight();
 }
 
-// ============ المؤقت ============
 function startSpeechTimer() {
   stopSpeechTimer();
   speechTimer = setInterval(() => {
@@ -804,7 +1467,6 @@ function stopSpeechTimer() {
   }
 }
 
-// ============ تظليل الآية ============
 function highlightVerse(index) {
   clearHighlight();
   const verses = document.querySelectorAll('.verse');
@@ -818,7 +1480,6 @@ function clearHighlight() {
   document.querySelectorAll('.verse.speaking').forEach(v => v.classList.remove('speaking'));
 }
 
-// ============ السحب يمين ويسار ============
 function initAudioSeek() {
   const track = document.getElementById('audio-track');
   const thumb = document.getElementById('audio-thumb');
@@ -900,7 +1561,6 @@ function updateAudioBarDrag(current, total, pct) {
   document.getElementById('audio-status').textContent = '👆 اسحب للتنقل';
 }
 
-// ============ إعادة التشغيل من كلمة معينة ============
 function restartFromWord(wordIndex) {
   let cumulative = 0;
   let targetVerse = 0;
@@ -921,11 +1581,48 @@ function restartFromWord(wordIndex) {
   speakNextVerse();
 }
 
-// ============ الأدوات ============
 function changeFontSize(delta) {
   fontSize = Math.max(14, Math.min(32, fontSize + delta * 2));
-  document.getElementById('verses-container').style.fontSize = fontSize + 'px';
+  const verses = document.getElementById('verses-container');
+  if (verses) verses.style.fontSize = fontSize + 'px';
   localStorage.setItem('bible_fontSize', fontSize);
+}
+
+function applyReadingFontSize() {
+  const size = Math.max(14, Math.min(32, Number(readingFontSize) || 20));
+  readingFontSize = size;
+  document.documentElement.style.setProperty('--reading-font-size', size + 'px');
+
+  const selectors = [
+    '#katameros-content .reading-text',
+    '#synaxarium-content .synax-section-body',
+    '#synaxarium-content .synaxarium-story',
+    '#prayer-content .prayer-section-body',
+    '#prayer-content .prayer-text',
+    '#prayer-content .prayer-single-text',
+    '#prayer-content .local-prayer-pages',
+    '#prayer-content .selected-psalm-view .prayer-section-body'
+  ];
+  document.querySelectorAll(selectors.join(',')).forEach(el => {
+    el.style.setProperty('font-size', size + 'px', 'important');
+  });
+}
+
+function changeReadingFontSize(delta) {
+  readingFontSize = Math.max(14, Math.min(32, readingFontSize + delta * 2));
+  localStorage.setItem('reading_fontSize', readingFontSize);
+  applyReadingFontSize();
+}
+
+function applyIconScale() {
+  iconScale = Math.max(0.50, Math.min(1.35, iconScale));
+  document.documentElement.style.setProperty('--app-icon-scale', String(iconScale));
+}
+
+function changeIconSize(delta) {
+  iconScale = Math.max(0.50, Math.min(1.35, iconScale + delta * 0.1));
+  localStorage.setItem('app_icon_scale', String(iconScale));
+  applyIconScale();
 }
 
 function toggleDarkMode() {
@@ -937,12 +1634,13 @@ function toggleDarkMode() {
   updateSettingsUI();
 }
 
-// ============ الإعدادات والتواصل ============
 function updateSettingsUI() {
   const themeBtn = document.getElementById('settings-theme-btn');
   const fontLabel = document.getElementById('settings-font-size');
+  const iconLabel = document.getElementById('settings-icon-size');
   if (themeBtn) themeBtn.textContent = isDark ? '☀️' : '🌙';
   if (fontLabel) fontLabel.textContent = `${fontSize}px`;
+  if (iconLabel) iconLabel.textContent = `${Math.round(iconScale * 100)}%`;
 }
 
 function showSettings() {
@@ -950,7 +1648,6 @@ function showSettings() {
   showScreen('settings-screen');
 }
 
-// ============ المفضلة ============
 function toggleVerseFavorite(verseText, reference) {
   const existing = favorites.findIndex(f => f.text === verseText);
   if (existing >= 0) favorites.splice(existing, 1);
@@ -1025,7 +1722,6 @@ function removeFavorite(index) {
   showFavorites();
 }
 
-// ============ آية اليوم ============
 function getDailyVerse() {
   const now = new Date();
   const year = now.getFullYear();
@@ -1034,15 +1730,45 @@ function getDailyVerse() {
   const dateKey = `${year}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const saved = JSON.parse(localStorage.getItem('bible_daily_verse') || 'null');
 
-  // الآية ثابتة طوال اليوم، وتُعاد قراءتها عند فتح التطبيق مرة أخرى.
   if (saved && saved.dateKey === dateKey && saved.year === year && dailyVerses[saved.index]) {
     return dailyVerses[saved.index];
   }
 
-  // تغيير ترتيب الاختيار مع بداية كل سنة حتى لا يبدأ العام الجديد بنفس التسلسل.
-  const index = (dayOfYear + (year * 7)) % dailyVerses.length;
+  const cycleDay = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(2026, 0, 1)) / 86400000);
+  const index = ((cycleDay % 700) + 700) % 700;
+  const verse = dailyVerses[index % dailyVerses.length];
   localStorage.setItem('bible_daily_verse', JSON.stringify({ dateKey, year, index }));
-  return dailyVerses[index];
+  return verse;
+}
+
+function renderHomeDailyVerse() {
+  const verse = getDailyVerse();
+  const text = document.getElementById('home-daily-text');
+  const ref = document.getElementById('home-daily-ref');
+  if (text) text.textContent = verse.text;
+  if (ref) ref.textContent = verse.ref;
+}
+
+function saveHomeDailyVerse() {
+  const verse = getDailyVerse();
+  const item = { text: verse.text, ref: verse.ref };
+  const exists = favorites.some(f => f.text === item.text && f.ref === item.ref);
+  if (!exists) {
+    favorites.unshift(item);
+    saveFavorites();
+  }
+  const btn = document.querySelector('.home-daily-actions .home-action-btn');
+  if (btn) {
+    btn.textContent = exists ? '☆ محفوظة' : '★ تم الحفظ';
+    setTimeout(() => { if (btn) btn.textContent = '☆ حفظ'; }, 1200);
+  }
+}
+
+function shareHomeDailyVerse() {
+  const verse = getDailyVerse();
+  const fullText = `${verse.text}\n— ${verse.ref} —\n\nمن تطبيق طريق النور`;
+  if (navigator.share) navigator.share({ title: 'آية اليوم', text: fullText });
+  else if (navigator.clipboard) navigator.clipboard.writeText(fullText).then(() => alert('تم نسخ الآية'));
 }
 
 function showDailyVerse() {
@@ -1061,7 +1787,6 @@ function shareVerse() {
   else navigator.clipboard.writeText(fullText).then(() => alert(' تم نسخ الآية'));
 }
 
-// ============ البحث ============
 const searchBookCache = new Map();
 let searchRequestId = 0;
 
@@ -1154,7 +1879,6 @@ async function performSearch() {
   let count = 0;
   const seen = new Set();
 
-  // البحث في البيانات المحلية أولاً.
   if (Array.isArray(bibleData)) {
     bibleData.forEach(book => {
       book.chapters?.forEach((chapter, chIdx) => {
@@ -1172,7 +1896,6 @@ async function performSearch() {
     });
   }
 
-  // إضافة النتائج المعروفة من الآيات المختارة حتى يعمل البحث حتى قبل تحميل أي إصحاح.
   if (typeof sampleVerses !== 'undefined' && count < 100) {
     Object.entries(sampleVerses).forEach(([key, verses]) => {
       if (count >= 100 || !Array.isArray(verses)) return;
@@ -1192,7 +1915,6 @@ async function performSearch() {
 
   results.querySelector('.search-loading')?.remove();
 
-  // إذا لم توجد نتيجة محلية، ابحث في جميع الأسفار من المصدر الإلكتروني.
   if (count === 0 && requestId === searchRequestId) {
     results.innerHTML = '<p class="search-loading" style="text-align:center;color:#999;padding:20px">جارٍ البحث في جميع الأسفار...</p>';
     try {
@@ -1209,7 +1931,6 @@ async function performSearch() {
   }
 }
 
-// ============ خطة القراءة ============
 function showReadingPlan() {
   const list = document.getElementById('plan-list');
   list.innerHTML = '';
@@ -1238,7 +1959,80 @@ function showReadingPlan() {
   showScreen('plan-screen');
 }
 
-// ============ التهيئة ============
+let swipeStartX = 0, swipeStartY = 0, swipeTracking = false;
+function navigateSwipe(direction) {
+  const active = document.querySelector('.screen.active');
+  if (!active) return;
+  if (active.id === 'reading-screen') {
+    const max = Number(generatedBibleNavigation.chapters[currentBook]?.length || 0);
+    if (!max) return;
+    const next = Math.min(max, Math.max(1, currentChapter + (direction > 0 ? 1 : -1)));
+    if (next !== currentChapter) openChapter(currentBook, next);
+    return;
+  }
+  if (active.id === 'prayer-screen') {
+    const parts = window.__currentPrayerParts || [];
+    const current = Number(window.__selectedPrayerPart);
+    const currentPart = Number.isFinite(current) ? parts[current] : null;
+    const psalms = window.__currentPsalms || [];
+    const selectedPsalm = Number(window.__selectedPsalm);
+    if (currentPart && currentPart.title === 'المزامير' && psalms.length) {
+      const selected = Number.isFinite(selectedPsalm) && selectedPsalm >= 0 ? selectedPsalm : 0;
+      const targetPsalm = selected + (direction > 0 ? 1 : -1);
+
+      if (targetPsalm >= 0 && targetPsalm < psalms.length) {
+        showPsalm(targetPsalm);
+        const select = document.getElementById('psalm-select');
+        if (select) select.value = String(targetPsalm);
+        return;
+      }
+
+      const nextPartIndex = current + (direction > 0 ? 1 : -1);
+      if (nextPartIndex >= 0 && nextPartIndex < parts.length) {
+        showPrayerPart(nextPartIndex);
+      }
+      return;
+    }
+    const next = Math.min(parts.length-1, Math.max(0, (Number.isFinite(current) ? current : 0) + (direction > 0 ? 1 : -1)));
+    if (parts[next]) showPrayerPart(next);
+    return;
+  }
+  if (active.id === 'katameros-screen') {
+    const parts = window.__katamerosParts || [];
+    const current = Number(window.__selectedKatamerosPart);
+    const next = Math.min(parts.length-1, Math.max(0, (Number.isFinite(current) ? current : 0) + (direction > 0 ? 1 : -1)));
+    if (parts[next]) showKatamerosPart(next);
+    return;
+  }
+  if (active.id === 'synaxarium-screen') {
+    const parts = window.__synaxParts || [];
+    if (parts.length < 2) return;
+    const current = Number(window.__selectedSynaxPart);
+    const next = Math.min(parts.length-1, Math.max(0, (Number.isFinite(current) ? current : 0) + (direction > 0 ? 1 : -1)));
+    if (parts[next]) showSynaxariumPart(next);
+  }
+}
+function initSwipeNavigation() {
+  document.addEventListener('touchstart', e => {
+    if (!e.touches || e.touches.length !== 1) return;
+    const target = e.target;
+    const active = document.querySelector('.screen.active');
+    const inPsalmArea = active && active.id === 'prayer-screen' && target.closest('.psalm-picker-box,.selected-psalm-view');
+    if (!inPsalmArea && target.closest('input,textarea,select,button,a,[contenteditable="true"],#audio-track')) return;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+    swipeTracking = true;
+  }, {passive:true});
+  document.addEventListener('touchend', e => {
+    if (!swipeTracking || !e.changedTouches || !e.changedTouches.length) return;
+    swipeTracking = false;
+    const dx = e.changedTouches[0].clientX - swipeStartX;
+    const dy = e.changedTouches[0].clientY - swipeStartY;
+    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    navigateSwipe(dx > 0 ? 1 : -1);
+  }, {passive:true});
+}
+
 window.addEventListener('DOMContentLoaded', async function() {
   try {
     if (isDark) {
@@ -1247,20 +2041,24 @@ window.addEventListener('DOMContentLoaded', async function() {
       if (themeBtn) themeBtn.textContent = '️';
     }
 
-    // توليد العهدين والأسفار والإصحاحات فور فتح الموقع.
     buildBibleNavigation();
+    renderHomeDailyVerse();
 
     await loadBibleData();
     initAudioSeek();
+    applyReadingFontSize();
+applyIconScale();
+initSwipeNavigation();
   } catch (error) {
     console.error('خطأ أثناء تهيئة الموقع:', error);
   }
 });
 
-// ضمان أن دوال الأزرار الموجودة في HTML متاحة دائمًا في النطاق العام.
 Object.assign(window, {
   showScreen, goHome, openTestament, backToBooks, openBook, backToChapters,
-  openChapter, speakVerses, stopSpeaking, changeFontSize, toggleDarkMode,
+  openChapter, speakVerses, stopSpeaking, changeFontSize, changeReadingFontSize, changeIconSize, toggleDarkMode,
   toggleFavorite, showFavorites, removeFavorite, showDailyVerse, shareVerse,
-  showSearch, performSearch, showReadingPlan, showSettings, updateSettingsUI
+  showSearch, performSearch, showReadingPlan, showSettings, updateSettingsUI,
+  openBibleMenu, openAgpeya, openPrayer, togglePrayerPicker, closePrayerPicker, showPrayerPart,
+  toggleDailyPicker, closeDailyPicker, showKatamerosPart, showSynaxariumPart, initSwipeNavigation
 });

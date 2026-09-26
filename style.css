@@ -18,7 +18,6 @@ body.dark {
   color: #e0e0e0;
 }
 
-/* ===== الشاشات ===== */
 .screen {
   display: none;
   min-height: 100vh;
@@ -35,7 +34,6 @@ body.dark {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ===== الهيدر الرئيسي ===== */
 .main-header {
   background: linear-gradient(135deg, #6d4c41, #4e342e);
   color: white;
@@ -57,7 +55,6 @@ body.dark {
   font-style: italic;
 }
 
-/* ===== قائمة الكروت ===== */
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -107,7 +104,6 @@ body.dark .menu-card {
 
 body.dark .menu-card h3 { color: #f5efe6; }
 
-/* ===== الشريط العلوي ===== */
 .top-bar {
   background: linear-gradient(135deg, #6d4c41, #4e342e);
   color: white;
@@ -142,7 +138,6 @@ body.dark .menu-card h3 { color: #f5efe6; }
   background: rgba(255,255,255,0.35);
 }
 
-/* ===== قائمة الأسفار ===== */
 .books-list {
   padding: 15px;
   max-width: 800px;
@@ -191,7 +186,6 @@ body.dark .menu-card h3 { color: #f5efe6; }
 body.dark .book-item { background: #2a2a2a; color: #e0e0e0; }
 body.dark .book-item:hover { background: #333; }
 
-/* ===== شبكة الإصحاحات ===== */
 .chapters-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
@@ -222,7 +216,6 @@ body.dark .book-item:hover { background: #333; }
 
 body.dark .chapter-btn { background: #2a2a2a; color: #e0e0e0; border-color: #444; }
 
-/* ===== شاشة القراءة ===== */
 .reading-controls {
   display: flex;
   justify-content: center;
@@ -249,7 +242,6 @@ body.dark .reading-controls { background: #222; border-color: #333; }
 
 body.dark .reading-controls button { background: #333; color: #e0e0e0; border-color: #444; }
 
-/* ===== شريط التقدم الصوتي ===== */
 .audio-progress-bar {
   background: #efe5d9;
   padding: 10px 20px 14px;
@@ -339,7 +331,6 @@ body.dark .audio-track { background: #444; }
   padding-right: 12px;
 }
 
-/* ===== الآيات ===== */
 .verses-container {
   padding: 25px 20px;
   max-width: 750px;
@@ -366,7 +357,6 @@ body.dark .audio-track { background: #444; }
   font-size: 16px;
 }
 
-/* ===== آية اليوم ===== */
 .daily-verse-card {
   background: white;
   margin: 30px 20px;
@@ -414,7 +404,6 @@ body.dark .daily-text { color: #e0e0e0; }
 
 .share-btn:hover { background: #6d4c41; }
 
-/* ===== المفضلة ===== */
 .favorites-list {
   padding: 15px;
   max-width: 800px;
@@ -465,7 +454,6 @@ body.dark .fav-item { background: #2a2a2a; }
   opacity: 0.6;
 }
 
-/* ===== البحث ===== */
 .search-box {
   padding: 20px;
   max-width: 800px;
@@ -515,7 +503,6 @@ body.dark .search-item { background: #2a2a2a; }
   font-family: 'Cairo', sans-serif;
 }
 
-/* ===== خطة القراءة ===== */
 .plan-container { padding: 20px; max-width: 800px; margin: 0 auto; }
 
 .plan-container > p {
@@ -556,7 +543,6 @@ body.dark .plan-item { background: #2a2a2a; }
   opacity: 0.5;
 }
 
-/* ===== موبايل ===== */
 @media (max-width: 480px) {
   .main-header h1 { font-size: 26px; }
   .menu-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 15px; }
@@ -567,7 +553,6 @@ body.dark .plan-item { background: #2a2a2a; }
   .audio-info { font-size: 12px; }
 }
 
-/* ===== تذييل القائمة الرئيسية ===== */
 .migo-footer {
   text-align: center;
   padding: 5px 20px 30px;
@@ -579,7 +564,6 @@ body.dark .plan-item { background: #2a2a2a; }
 body.dark .migo-footer { color: #aaa; }
 body.dark .migo-footer strong { color: #f5efe6; }
 
-/* ===== الإعدادات والتواصل ===== */
 .settings-container {
   max-width: 700px;
   margin: 0 auto;
@@ -658,7 +642,6 @@ body.dark .contact-card p { color: #bbb; }
 .settings-footer { text-align: center; color: #8d6e63; font-size: 13px; padding: 8px; }
 
 
-/* ===== تحميل وقراءة الإصحاح ===== */
 .chapter-loading,
 .chapter-error {
   max-width: 700px;
@@ -738,4 +721,477 @@ body.dark .chapter-error {
   margin-right: 0;
   text-align: center;
   vertical-align: baseline;
+}
+
+
+.inner-menu-grid{max-width:900px;margin:30px auto}
+.agpeya-container{max-width:900px;margin:0 auto;padding:28px 18px 60px}
+.agpeya-intro{text-align:center;color:#aebbc9;margin:0 0 22px}
+.agpeya-list{display:grid;gap:14px}
+.prayer-card{
+  width:100%;border:1px solid rgba(255,255,255,.09);border-radius:18px;
+  background:rgba(255,255,255,.055);color:#fff;padding:18px;
+  display:flex;align-items:center;gap:15px;text-align:right;cursor:pointer;
+  transition:.2s;font-family:inherit
+}
+.prayer-card:hover{transform:translateY(-2px);background:rgba(255,255,255,.09)}
+.prayer-icon{font-size:31px;width:45px;text-align:center}
+.prayer-info{display:flex;flex-direction:column;flex:1;gap:3px}
+.prayer-info strong{font-size:18px}
+.prayer-info small{color:#9eacbd;font-size:13px}
+.prayer-arrow{font-size:22px;color:#dfb758}
+.prayer-content{max-width:850px;margin:auto;padding:30px 18px 70px}
+.prayer-card-large{
+  text-align:center;border:1px solid rgba(255,255,255,.09);border-radius:24px;
+  background:rgba(255,255,255,.055);padding:35px 22px
+}
+.prayer-big-icon{font-size:58px}
+.prayer-card-large h2{margin:12px 0 5px}
+.prayer-card-large>p{color:#aebbc9}
+.prayer-notice{margin:30px auto;padding:22px;max-width:650px;border-radius:17px;background:rgba(218,174,82,.08);border:1px solid rgba(218,174,82,.16)}
+.prayer-notice strong{color:#e2b957;font-size:19px}
+.prayer-notice p{color:#c2ccd8;line-height:1.9;margin-bottom:0}
+.prayer-note{font-size:13px!important;color:#7f8da0!important}
+
+.main-header{padding:48px 20px 38px;background:linear-gradient(145deg,#07192d,#0d2942);border-bottom:1px solid rgba(226,185,87,.18);box-shadow:0 12px 35px rgba(0,0,0,.16)}
+.main-header h1{letter-spacing:.2px}
+.menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:22px 18px;max-width:760px}
+.menu-card{position:relative;overflow:hidden;border:1px solid rgba(16,48,74,.09);border-radius:20px;padding:22px 14px;min-height:145px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(10,35,55,.08)}
+.menu-card:active{transform:scale(.98)}
+.menu-card .icon{font-size:34px;margin-bottom:9px}
+.featured-card{border-color:rgba(190,148,54,.32);background:linear-gradient(145deg,#fffdf8,#f5ead3)}
+.featured-card:after{content:'';position:absolute;inset:auto -25px -45px;width:100px;height:100px;border-radius:50%;background:rgba(210,169,75,.08)}
+body.dark .menu-card{background:#13263a;border-color:rgba(255,255,255,.07)}
+body.dark .featured-card{background:linear-gradient(145deg,#162d44,#102438);border-color:rgba(226,185,87,.22)}
+.inner-menu-grid{margin:24px auto;padding-top:8px}
+.inner-menu-grid .menu-card{min-height:170px}
+.agpeya-container{max-width:760px;padding:22px 18px 60px}
+.agpeya-intro{background:rgba(226,185,87,.08);border:1px solid rgba(226,185,87,.16);border-radius:15px;padding:12px 16px;color:#7d6a3c;margin-bottom:18px}
+body.dark .agpeya-intro{color:#d9c27e}
+.agpeya-list{gap:10px}
+.prayer-card{position:relative;min-height:78px;border:1px solid rgba(21,53,79,.10);border-radius:17px;background:#fff;color:#203449;padding:13px 14px;gap:11px;box-shadow:0 5px 18px rgba(12,39,62,.06);transition:transform .18s,box-shadow .18s,border-color .18s}
+.prayer-card:hover{transform:translateY(-1px);background:#fff;box-shadow:0 8px 24px rgba(12,39,62,.1);border-color:rgba(190,148,54,.3)}
+body.dark .prayer-card{background:#13263a;color:#f0f4f7;border-color:rgba(255,255,255,.08)}
+.prayer-index{width:28px;height:28px;border-radius:9px;background:#f4ead3;color:#9a742d;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:none}
+body.dark .prayer-index{background:#263b50;color:#e1bd62}
+.prayer-icon{font-size:27px;width:38px;flex:none}
+.prayer-info{align-items:flex-start;gap:2px}
+.prayer-info strong{font-size:16px}
+.prayer-info small{font-size:12px;color:#8b98a6}
+.prayer-arrow{font-size:28px;line-height:1;color:#b78932;width:24px;text-align:center}
+.prayer-content{max-width:760px;padding:24px 18px 70px}
+.prayer-card-large{background:#fff;color:#26394b;border:1px solid rgba(21,53,79,.09);box-shadow:0 10px 30px rgba(10,35,55,.08);padding:32px 20px}
+body.dark .prayer-card-large{background:#13263a;color:#eef3f7}
+.prayer-notice{background:#fbf5e8;border-color:rgba(190,148,54,.2)}
+body.dark .prayer-notice{background:rgba(226,185,87,.08)}
+@media(max-width:560px){.menu-grid{grid-template-columns:1fr 1fr;gap:10px;padding:16px 12px}.menu-card{min-height:132px;padding:18px 9px}.menu-card h3{font-size:14px}.menu-card p{font-size:11px}.inner-menu-grid .menu-card{min-height:150px}}
+
+.daily-service-card{border-color:rgba(190,148,54,.25)!important}
+.daily-content{max-width:820px;margin:0 auto;padding:22px 18px 70px}
+.daily-date{text-align:center;margin:0 auto 18px;padding:11px 15px;border-radius:14px;background:rgba(226,185,87,.08);border:1px solid rgba(226,185,87,.16);color:#8c6d2d;font-weight:700}
+body.dark .daily-date{color:#e1bd62}
+.loading-card,.online-error{padding:28px 18px;text-align:center;border-radius:20px;background:#fff;border:1px solid rgba(21,53,79,.09);box-shadow:0 8px 25px rgba(10,35,55,.06);color:#647386}
+body.dark .loading-card,body.dark .online-error{background:#13263a;color:#c5d0dc;border-color:rgba(255,255,255,.08)}
+.online-error-icon{font-size:42px;margin-bottom:8px}
+.online-error h3{margin:5px 0 8px;color:#9a742d}
+body.dark .online-error h3{color:#e1bd62}
+.online-error p{line-height:1.8;margin:0 0 16px}
+.online-error button{border:0;border-radius:12px;padding:10px 18px;background:#b78932;color:#fff;font-family:inherit;cursor:pointer}
+.daily-reading-list{display:grid;gap:13px}
+.reading-card{background:#fff;border:1px solid rgba(21,53,79,.09);border-radius:18px;padding:17px 18px;box-shadow:0 7px 22px rgba(10,35,55,.055)}
+body.dark .reading-card{background:#13263a;border-color:rgba(255,255,255,.08)}
+.reading-label{font-weight:700;color:#a27a2d;margin-bottom:8px;font-size:15px}
+.reading-text{color:#273b50;line-height:2;font-size:17px;white-space:normal}
+body.dark .reading-text{color:#edf2f6}
+.synaxarium-content{display:grid;gap:15px}
+.synaxarium-card{background:#fff;border:1px solid rgba(21,53,79,.09);border-radius:22px;padding:27px 20px;box-shadow:0 9px 28px rgba(10,35,55,.06)}
+body.dark .synaxarium-card{background:#13263a;border-color:rgba(255,255,255,.08)}
+.synaxarium-icon{text-align:center;font-size:48px;margin-bottom:8px}
+.synaxarium-card h2{text-align:center;color:#283d52;font-size:21px;line-height:1.6;margin:0 0 10px}
+body.dark .synaxarium-card h2{color:#f0f4f7}
+.coptic-date{text-align:center;color:#a27a2d;margin-bottom:18px;font-weight:700}
+.feast-list{display:grid;gap:9px;margin:0 0 22px}
+.feast-list div{padding:11px 13px;border-radius:13px;background:#fbf5e8;color:#5d4a27;line-height:1.8}
+body.dark .feast-list div{background:rgba(226,185,87,.08);color:#e3d19f}
+.synaxarium-story{font-size:18px;line-height:2.15;color:#2d4054;text-align:right}
+body.dark .synaxarium-story{color:#e9eef3}
+.online-prayer-card{text-align:right}
+.online-prayer-card .prayer-big-icon,.online-prayer-card h2,.online-prayer-card>.online-source{text-align:center}
+.online-source{color:#9a742d!important;font-size:13px!important}
+.prayer-text-wrap{margin-top:20px}
+.prayer-text{font-size:18px;line-height:2.15;color:#2d4054;margin:0 0 17px;padding:15px 16px;border-radius:14px;background:#faf7f0;border-right:3px solid #c49a43}
+body.dark .prayer-text{color:#edf2f6;background:rgba(255,255,255,.035);border-right-color:#d3ad58}
+@media(max-width:560px){
+  .daily-content{padding:17px 12px 55px}
+  .reading-text,.prayer-text,.synaxarium-story{font-size:16px;line-height:2}
+  .synaxarium-card{padding:23px 15px}
+}
+.online-prayer-card{padding:24px 18px 30px!important;text-align:right!important}
+.online-prayer-card .prayer-big-icon{text-align:center!important;margin-bottom:4px}
+.online-prayer-card h2{text-align:center!important;margin-bottom:22px!important}
+.prayer-single-text{
+  background:#faf7f0;border:1px solid rgba(190,148,54,.16);border-radius:18px;
+  padding:22px 19px;color:#26394b;font-size:19px;line-height:2.25;
+  text-align:right;direction:rtl;white-space:normal;word-break:normal;overflow-wrap:anywhere;
+}
+body.dark .prayer-single-text{background:rgba(255,255,255,.035);color:#edf2f6;border-color:rgba(255,255,255,.08)}
+.prayer-text-wrap,.online-source{display:none!important}
+.reading-label:empty{display:none}
+@media(max-width:560px){.prayer-single-text{font-size:17px;line-height:2.15;padding:18px 15px}}
+
+.prayer-sections,.katameros-sections{display:grid;gap:16px;margin-top:20px}
+.prayer-section,.reading-card{overflow:hidden;border-radius:18px;border:1px solid rgba(181,142,55,.22);background:#fffdf8;box-shadow:0 7px 22px rgba(23,45,66,.055)}
+.prayer-section-title,.reading-label{padding:13px 17px;background:linear-gradient(135deg,#f4e5bd,#fbf4df);color:#76591d;font-weight:800;font-size:17px;border-bottom:1px solid rgba(181,142,55,.16);margin:0}
+.prayer-section-body,.reading-text{padding:18px 18px 21px;color:#273b50;line-height:2.25;font-size:18px;text-align:right;direction:rtl}
+body.dark .prayer-section,body.dark .reading-card{background:#13263a;border-color:rgba(226,185,87,.18)}
+body.dark .prayer-section-title,body.dark .reading-label{background:linear-gradient(135deg,#243a50,#1b3045);color:#e4c56f;border-bottom-color:rgba(226,185,87,.15)}
+body.dark .prayer-section-body,body.dark .reading-text{color:#edf2f6}
+.online-prayer-card h2{color:#26394b}
+body.dark .online-prayer-card h2{color:#f0f4f7}
+.prayer-single-text{display:none!important}
+@media(max-width:560px){
+  .prayer-section-title,.reading-label{font-size:15px;padding:12px 14px}
+  .prayer-section-body,.reading-text{font-size:16.5px;line-height:2.1;padding:16px 14px 18px}
+}
+
+.synaxarium-content,.daily-reading-list{width:100%;max-width:820px;margin:0 auto;box-sizing:border-box}
+.synax-section{padding:0!important;overflow:hidden;box-sizing:border-box;width:100%;max-width:820px}
+.synax-section-title{padding:14px 17px;background:linear-gradient(135deg,#f4e5bd,#fbf4df);color:#76591d;font-weight:800;font-size:17px;border-bottom:1px solid rgba(181,142,55,.16);text-align:right;direction:rtl;box-sizing:border-box}
+.synax-section-body{padding:18px 18px 21px;color:#273b50;line-height:2.2;font-size:17px;text-align:right;direction:rtl;overflow-wrap:anywhere;box-sizing:border-box;width:100%}
+.synax-event{border-top:1px solid rgba(181,142,55,.12);background:#fffdf8}
+body.dark .synax-section{background:#13263a;border-color:rgba(226,185,87,.18)}
+body.dark .synax-section-title{background:linear-gradient(135deg,#243a50,#1b3045);color:#e4c56f}
+body.dark .synax-section-body{color:#edf2f6}
+body.dark .synax-event{background:#13263a;border-top-color:rgba(226,185,87,.12)}
+.reading-card{padding:0!important;overflow:hidden;width:100%;max-width:820px;box-sizing:border-box}
+.reading-label{margin:0!important;box-sizing:border-box;text-align:right;direction:rtl}
+.reading-text{box-sizing:border-box;width:100%;overflow-wrap:anywhere;word-break:normal}
+@media(max-width:560px){
+  .synax-section-title,.reading-label{font-size:15px;padding:12px 14px}
+  .synax-section-body,.reading-text{font-size:16px;line-height:2.05;padding:16px 14px 19px}
+}
+
+
+.prayer-selector-btn{
+  width:100%;max-width:560px;margin:8px auto 18px;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;border:1px solid rgba(181,142,55,.30);border-radius:16px;padding:15px 17px;
+  background:linear-gradient(135deg,#fffdf8,#f7edd8);color:#76591d;font-family:inherit;font-weight:800;
+  font-size:17px;cursor:pointer;box-shadow:0 7px 18px rgba(23,45,66,.07);transition:.18s;direction:rtl;text-align:right
+}
+.prayer-selector-btn:hover{transform:translateY(-1px);box-shadow:0 9px 23px rgba(23,45,66,.10)}
+.prayer-selector-arrow{font-size:22px;line-height:1;transition:transform .18s}
+.prayer-selector-btn[aria-expanded="true"] .prayer-selector-arrow{transform:rotate(180deg)}
+.prayer-choice-list{display:grid;gap:8px;direction:rtl}
+.prayer-choice{width:100%;border:1px solid rgba(181,142,55,.22);background:#fffdf8;color:#76591d;border-radius:13px;padding:13px 15px;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer;transition:.16s;box-shadow:0 3px 10px rgba(23,45,66,.04);text-align:right}
+.prayer-choice:hover,.prayer-choice:active{background:#f4e5bd;border-color:#b78932}
+.prayer-part-view{border:1px solid rgba(181,142,55,.22);border-radius:18px;overflow:hidden;background:#fffdf8;box-shadow:0 7px 22px rgba(23,45,66,.055)}
+.prayer-part-view .prayer-section-title{margin:0}
+.prayer-part-view .prayer-section-body{min-height:120px}
+.prayer-part-empty{min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:24px;color:#8794a1;text-align:center}
+.prayer-empty-icon{font-size:30px;color:#b78932;opacity:.75}
+.prayer-empty-text{font-size:15px;line-height:1.8}
+
+.prayer-picker-overlay{
+  position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;
+  padding:20px;background:rgba(4,18,31,.52);backdrop-filter:blur(3px);
+}
+.prayer-picker-overlay.show{display:flex}
+.prayer-picker{
+  width:min(92vw,520px);max-height:min(78vh,650px);overflow:auto;background:#fff;border-radius:22px;
+  box-shadow:0 22px 60px rgba(0,0,0,.28);padding:18px;direction:rtl;
+  animation:prayerPickerIn .18s ease-out
+}
+.prayer-picker-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(21,53,79,.10)}
+.prayer-picker-head strong{font-size:20px;color:#26394b}
+.prayer-picker-head button{width:36px;height:36px;border:0;border-radius:50%;background:#f4ead3;color:#76591d;font-size:25px;line-height:1;cursor:pointer}
+body.dark .prayer-selector-btn{background:linear-gradient(135deg,#1c344a,#162a3e);color:#e4c56f;border-color:rgba(226,185,87,.22)}
+body.dark .prayer-part-empty{background:#13263a;color:#aebbc9}
+body.dark .prayer-picker{background:#13263a}
+body.dark .prayer-picker-head{border-bottom-color:rgba(255,255,255,.08)}
+body.dark .prayer-picker-head strong{color:#f0f4f7}
+body.dark .prayer-picker-head button{background:#263b50;color:#e4c56f}
+body.dark .prayer-choice{background:#162d42;color:#e4c56f;border-color:rgba(226,185,87,.18)}
+body.dark .prayer-choice:hover,body.dark .prayer-choice:active{background:#263b50}
+body.prayer-picker-open{overflow:hidden}
+@keyframes prayerPickerIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:560px){
+  .prayer-selector-btn{font-size:16px;padding:14px 15px}
+  .prayer-picker{width:calc(100vw - 24px);padding:14px;border-radius:19px}
+  .prayer-choice{font-size:14px;padding:12px 13px}
+}
+
+
+.local-prayer-note{margin:0 auto 14px;max-width:560px;text-align:center;color:#7d6a3c;font-size:14px;line-height:1.8}
+.local-prayer-pages{display:flex;flex-direction:column;gap:10px;background:#eef1f3;padding:10px;box-sizing:border-box}
+.local-prayer-page{display:block;width:100%;height:auto;border-radius:8px;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.10);user-select:none;-webkit-user-drag:none}
+body.dark .local-prayer-pages{background:#0d1d2b}
+body.dark .local-prayer-note{color:#d9c27e}
+
+.local-prayer-card .prayer-section-body{
+  direction:rtl;text-align:right;white-space:normal;line-height:2.05;font-size:17px;
+  color:#26394b;padding:20px 18px;background:#fffdf8;word-break:normal;overflow-wrap:anywhere;
+}
+.local-prayer-card .prayer-section-title{direction:rtl;text-align:right;padding:15px 18px;background:linear-gradient(135deg,#f8efd9,#fffaf0);color:#76591d;font-size:18px;font-weight:900;border-bottom:1px solid rgba(181,142,55,.16)}
+body.dark .local-prayer-card .prayer-section-body{background:#13263a;color:#eef3f7}
+body.dark .local-prayer-card .prayer-section-title{background:#1b3349;color:#e4c56f}
+.local-prayer-note{font-weight:700}
+.prayer-choice{min-height:50px}
+
+.psalm-picker-box{padding:16px;background:#fffaf0;border-bottom:1px solid rgba(181,142,55,.14);display:grid;gap:9px}
+.psalm-picker-box label{font-weight:800;color:#76591d;font-size:15px}
+.psalm-select{width:100%;min-height:48px;border:1px solid rgba(181,142,55,.28);border-radius:13px;background:#fff;color:#26394b;padding:10px 13px;font-family:inherit;font-size:16px;outline:none}
+.selected-psalm-view{margin:12px;border:1px solid rgba(181,142,55,.18);border-radius:15px;overflow:hidden;background:#fffdf8;min-height:120px;display:flex;flex-direction:column;justify-content:center}
+.selected-psalm-view .prayer-empty-icon,.selected-psalm-view .prayer-empty-text{align-self:center}
+body.dark .psalm-picker-box{background:#172f43;border-bottom-color:rgba(226,185,87,.14)}
+body.dark .psalm-picker-box label{color:#e4c56f}
+body.dark .psalm-select{background:#102638;color:#f0f4f7;border-color:rgba(226,185,87,.22)}
+body.dark .selected-psalm-view{background:#13263a;border-color:rgba(226,185,87,.18)}
+
+#reading-screen,#prayer-screen{touch-action:pan-y}
+
+
+.daily-selector-wrap{margin:14px 0 16px;display:flex;justify-content:center}
+.daily-selector-btn{width:min(100%,720px);display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid rgba(255,255,255,.14);border-radius:16px;padding:14px 18px;background:var(--card-bg,#fff);color:inherit;font:inherit;font-weight:800;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.08)}
+.daily-selected-view{width:100%}
+.daily-picker-overlay{position:fixed;inset:0;z-index:10000;display:none;align-items:flex-end;justify-content:center;padding:16px;background:rgba(0,0,0,.55)}
+.daily-picker-overlay.show{display:flex}
+.daily-picker{width:min(680px,100%);max-height:min(78vh,700px);overflow:auto;background:var(--card-bg,#fff);color:inherit;border-radius:24px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.daily-picker-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.daily-picker-head button{border:0;background:transparent;color:inherit;font-size:28px;cursor:pointer}
+.daily-choice-list{display:grid;gap:9px}
+.daily-choice{width:100%;text-align:right;border:1px solid rgba(127,127,127,.22);background:transparent;color:inherit;border-radius:14px;padding:14px 16px;font:inherit;font-weight:700;cursor:pointer}
+.daily-choice:active,.daily-selector-btn:active{transform:scale(.99)}
+body.daily-picker-open{overflow:hidden}
+.dark .daily-selector-btn,.dark .daily-picker{background:#151a22;border-color:rgba(255,255,255,.1)}
+.dark .daily-choice{border-color:rgba(255,255,255,.12)}
+@media(max-width:600px){
+  .daily-picker-overlay{padding:10px}
+  .daily-picker{border-radius:20px;padding:14px}
+  .daily-selector-btn{padding:13px 15px;font-size:14px}
+}
+
+#reading-screen,#prayer-screen,#katameros-screen,#synaxarium-screen{touch-action:pan-y}
+.daily-selected-view,.synaxarium-content,.reading-text,.synax-section-body{touch-action:pan-y}
+.daily-choice{touch-action:manipulation}
+
+.daily-cycle-note{display:block;margin-top:8px;opacity:.7;font-size:12px;text-align:center}
+
+:root{
+  --ref-bg:#f6f1eb;
+  --ref-card:#fff;
+  --ref-txt:#29231f;
+  --ref-muted:#766c64;
+  --ref-p:#6f4e37;
+  --ref-p2:#8d6e63;
+  --ref-line:#e5dbd2;
+  --ref-soft:#efe5dd;
+}
+body{
+  background:var(--ref-bg)!important;
+  color:var(--ref-txt)!important;
+  font-family:Tahoma,Arial,sans-serif!important;
+}
+.main-header{
+  color:#fff!important;
+  padding:20px 18px 17px!important;
+  border-radius:0 0 28px 28px!important;
+  background:linear-gradient(145deg,#5d4037,#8d6e63)!important;
+  box-shadow:0 8px 22px rgba(0,0,0,.08)!important;
+  border:0!important;
+  position:sticky;
+  top:0;
+  z-index:100;
+}
+.main-header h1{
+  font-family:Tahoma,Arial,sans-serif!important;
+  font-size:23px!important;
+  margin:0 0 5px!important;
+  letter-spacing:0!important;
+}
+.subtitle{font-size:12px!important;opacity:.85!important;font-style:normal!important}
+.top-bar{
+  background:linear-gradient(145deg,#5d4037,#8d6e63)!important;
+  padding:14px 16px!important;
+  border-radius:0 0 20px 20px!important;
+  box-shadow:0 5px 18px rgba(0,0,0,.10)!important;
+}
+.top-bar h2{font-family:Tahoma,Arial,sans-serif!important;font-size:18px!important}
+.top-bar button{background:#ffffff20!important;border-radius:50%!important}
+.menu-grid{gap:11px!important;padding:18px!important;max-width:760px!important}
+.menu-card{
+  background:#fff!important;
+  color:#29231f!important;
+  border:1px solid #e5dbd2!important;
+  border-radius:18px!important;
+  padding:15px!important;
+  min-height:115px!important;
+  box-shadow:0 8px 22px rgba(0,0,0,.05)!important;
+}
+.menu-card:hover{transform:none!important;background:#fff!important;border-color:#e5dbd2!important}
+.menu-card .icon{font-size:28px!important;margin-bottom:0!important}
+.menu-card h3{color:#29231f!important;margin-top:9px!important}
+.menu-card p{color:#766c64!important}
+.book-item,.prayer-card,.reading-card,.synaxarium-card,.prayer-card-large,.online-prayer-card,.loading-card,.online-error{
+  background:#fff!important;
+  color:#29231f!important;
+  border-color:#e5dbd2!important;
+  box-shadow:0 8px 22px rgba(0,0,0,.05)!important;
+}
+.book-item{border-right:4px solid #8d6e63!important}
+.prayer-card:hover{background:#fff!important;border-color:#e5dbd2!important}
+.prayer-info small,.reading-text,.synaxarium-story,.prayer-section-body{color:#766c64!important}
+.prayer-index{background:#efe5dd!important;color:#6f4e37!important}
+.prayer-arrow{color:#6f4e37!important}
+.agpeya-intro,.daily-date{background:#efe5dd!important;border-color:#e5dbd2!important;color:#6f4e37!important}
+.prayer-section,.reading-card,.synax-section,.prayer-part-view{
+  background:#fff!important;
+  border-color:#e5dbd2!important;
+  border-radius:18px!important;
+  box-shadow:0 8px 22px rgba(0,0,0,.05)!important;
+}
+.prayer-section-title,.reading-label,.synax-section-title{
+  background:linear-gradient(145deg,#efe5dd,#f7f0ea)!important;
+  color:#6f4e37!important;
+  border-bottom-color:#e5dbd2!important;
+}
+.prayer-section-body,.reading-text,.synax-section-body{color:#29231f!important}
+.prayer-selector-btn{
+  background:linear-gradient(145deg,#fff,#efe5dd)!important;
+  color:#6f4e37!important;
+  border-color:#e5dbd2!important;
+}
+.prayer-choice{background:#fff!important;color:#6f4e37!important;border-color:#e5dbd2!important}
+.prayer-choice:hover,.prayer-choice:active{background:#efe5dd!important;border-color:#8d6e63!important}
+.prayer-picker{background:#fff!important}
+.prayer-picker-head strong{color:#29231f!important}
+.prayer-picker-head button{background:#efe5dd!important;color:#6f4e37!important}
+.prayer-text,.prayer-single-text,.local-prayer-pages{background:#f6f1eb!important;color:#29231f!important}
+.btn{background:#6f4e37!important}
+.softbtn{background:#efe5dd!important;color:#6f4e37!important}
+.badge{background:#efe5dd!important;color:#6f4e37!important}
+.daily-reading-list{gap:11px!important}
+.daily-service-card{border-color:#e5dbd2!important}
+body.dark{
+  background:#171412!important;
+  color:#f4eee8!important;
+}
+body.dark .main-header,body.dark .top-bar{background:linear-gradient(145deg,#5d4037,#8d6e63)!important}
+body.dark .menu-card,body.dark .book-item,body.dark .prayer-card,body.dark .reading-card,body.dark .synaxarium-card,body.dark .prayer-card-large,body.dark .online-prayer-card,body.dark .prayer-section,body.dark .reading-card,body.dark .synax-section,body.dark .prayer-part-view,body.dark .prayer-picker{
+  background:#24201d!important;color:#f4eee8!important;border-color:#3a322d!important;
+}
+body.dark .menu-card h3,body.dark .prayer-info strong,body.dark .synaxarium-card h2,body.dark .online-prayer-card h2{color:#f4eee8!important}
+body.dark .menu-card p,body.dark .prayer-info small{color:#b9aca2!important}
+body.dark .prayer-section-title,body.dark .reading-label,body.dark .synax-section-title{background:#352c27!important;color:#c29b88!important;border-color:#3a322d!important}
+body.dark .prayer-section-body,body.dark .reading-text,body.dark .synax-section-body,body.dark .synaxarium-story{color:#f4eee8!important}
+body.dark .prayer-text,body.dark .prayer-single-text,body.dark .local-prayer-pages{background:#171412!important;color:#f4eee8!important}
+
+.home-content{padding:0 0 105px;max-width:760px;margin:0 auto}
+.main-header{display:flex!important;align-items:center!important;justify-content:space-between!important;text-align:right!important;min-height:191px!important;padding:28px 30px 25px!important}
+.main-header-brand{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;direction:rtl;margin-left:auto}
+.main-header h1{font-size:32px!important;line-height:1.2!important;font-weight:700!important}
+.subtitle{font-size:16px!important;line-height:1.7!important}
+.home-theme-btn{flex:0 0 72px;width:72px;height:72px;border:0;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+.home-theme-btn:active{transform:scale(.96)}
+.home-title{font-family:'Amiri',Tahoma,serif!important;font-size:38px!important;line-height:1.2!important;text-align:right!important;padding:44px 30px 26px!important;color:#29231f!important}
+.home-daily-card{margin:0 30px 40px;background:#fff;border:1px solid #e5dbd2;border-radius:28px;padding:32px 30px 30px;box-shadow:0 8px 25px rgba(67,48,37,.07);text-align:right}
+.home-daily-label{font-size:20px;font-weight:800;color:#a48643;margin-bottom:25px}
+.home-daily-text{font-family:'Amiri',Tahoma,serif;font-size:28px;line-height:1.9;color:#29231f;text-align:center;min-height:55px}
+.home-daily-ref{font-family:'Amiri',Tahoma,serif;font-size:19px;color:#766c64;text-align:right;margin-top:7px}
+.home-daily-actions{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
+.home-action-btn{border:0;border-radius:18px;background:#efe5dd;color:#765c48;font:inherit;font-size:18px;font-weight:700;padding:14px 10px;cursor:pointer;min-height:58px}
+.home-action-btn:active{transform:scale(.98)}
+.home-section-title{font-family:'Amiri',Tahoma,serif!important;font-size:32px!important;text-align:right!important;color:#29231f!important;padding:0 30px 18px!important}
+.menu-grid{padding:0 30px 30px!important;gap:16px!important}
+.menu-card{min-height:220px!important;border-radius:25px!important;padding:28px 18px!important;display:flex;flex-direction:column;align-items:center;justify-content:center!important}
+.menu-card .icon{font-size:52px!important;margin-bottom:12px!important}
+.menu-card h3{font-size:21px!important;margin-top:0!important;margin-bottom:6px!important}
+.menu-card p{font-size:15px!important}
+.migo-footer{display:none!important}
+.home-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:5000;height:86px;background:rgba(255,255,255,.98);border-top:1px solid #ddd4cc;box-shadow:0 -5px 20px rgba(0,0,0,.05);display:grid;grid-template-columns:repeat(5,1fr);padding:7px 4px calc(7px + env(safe-area-inset-bottom));direction:rtl}
+.home-nav-item{border:0;background:transparent;color:#7d746d;font:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;min-width:0}
+.home-nav-item span{font-size:29px;line-height:1.15}
+.home-nav-item small{font-size:12px;line-height:1.2;white-space:nowrap}
+.home-nav-item.active{color:#8b6d35}
+body.dark .home-title,body.dark .home-section-title{color:#f4eee8!important}
+body.dark .home-daily-card{background:#24201d;border-color:#3a322d}
+body.dark .home-daily-text{color:#f4eee8}
+body.dark .home-daily-ref{color:#b9aca2}
+body.dark .home-action-btn{background:#352c27;color:#d5b58f}
+body.dark .home-bottom-nav{background:rgba(31,27,24,.98);border-top-color:#3a322d}
+body.dark .home-nav-item{color:#b9aca2}
+body.dark .home-nav-item.active{color:#d4ad68}
+@media(max-width:600px){
+  .main-header{min-height:191px!important;padding:28px 30px 25px!important}
+  .main-header h1{font-size:31px!important}
+  .subtitle{font-size:15px!important}
+  .home-theme-btn{width:72px;height:72px;font-size:29px}
+  .home-title{font-size:35px!important;padding:44px 30px 25px!important}
+  .home-daily-card{margin-left:30px;margin-right:30px;padding:31px 28px 29px;border-radius:28px}
+  .home-daily-label{font-size:19px}
+  .home-daily-text{font-size:27px;line-height:1.85}
+  .home-daily-ref{font-size:18px}
+  .home-section-title{font-size:31px!important;padding:0 30px 18px!important}
+  .menu-grid{padding:0 30px 30px!important;gap:16px!important}
+  .menu-card{min-height:220px!important}
+}
+.main-header{min-height:160px!important;padding:22px 24px 18px!important}
+.main-header h1{font-size:27px!important}
+.subtitle{font-size:13px!important}
+.home-theme-btn{flex-basis:58px;width:58px;height:58px;font-size:24px}
+.home-title{font-size:31px!important;padding:32px 24px 20px!important}
+.home-daily-card{margin:0 24px 30px;padding:24px 22px 22px;border-radius:22px}
+.home-daily-label{font-size:17px;margin-bottom:16px}
+.home-daily-text{font-size:23px;line-height:1.7;min-height:45px}
+.home-daily-ref{font-size:16px;margin-top:4px}
+.home-daily-actions{gap:10px;margin-top:20px}
+.home-action-btn{font-size:16px;padding:10px 8px;min-height:48px;border-radius:14px}
+.home-section-title{font-size:29px!important;padding:0 24px 14px!important}
+.menu-grid{padding:0 24px 24px!important;gap:12px!important}
+.menu-card{min-height:165px!important;border-radius:20px!important;padding:20px 12px!important}
+.menu-card .icon{font-size:40px!important;margin-bottom:8px!important}
+.menu-card h3{font-size:18px!important;margin-bottom:4px!important}
+.menu-card p{font-size:13px!important}
+.home-bottom-nav{height:74px;padding:5px 3px calc(5px + env(safe-area-inset-bottom))}
+.home-nav-item span{font-size:25px}
+.home-nav-item small{font-size:11px}
+@media(max-width:600px){
+  .main-header{min-height:160px!important;padding:22px 24px 18px!important}
+  .main-header h1{font-size:27px!important}
+  .subtitle{font-size:13px!important}
+  .home-theme-btn{width:58px;height:58px;font-size:24px}
+  .home-title{font-size:31px!important;padding:32px 24px 20px!important}
+  .home-daily-card{margin-left:24px;margin-right:24px;padding:24px 22px 22px;border-radius:22px}
+  .home-daily-label{font-size:17px}
+  .home-daily-text{font-size:23px;line-height:1.7}
+  .home-daily-ref{font-size:16px}
+  .home-section-title{font-size:29px!important;padding:0 24px 14px!important}
+  .menu-grid{padding:0 24px 24px!important;gap:12px!important}
+  .menu-card{min-height:165px!important}
+}
+
+:root{--reading-font-size:20px;--app-icon-scale:1}
+.content-font-toolbar{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin:10px 16px 12px;padding:8px 10px;background:#fff;border:1px solid #e5dbd2;border-radius:14px;box-shadow:0 5px 15px rgba(67,48,37,.05);direction:rtl}
+.content-font-toolbar span{font-size:13px;color:#766c64;margin-left:auto}
+.content-font-toolbar button{min-width:40px;height:36px;border:0;border-radius:10px;background:#efe5dd;color:#6f4e37;font:700 16px Tahoma,Arial,sans-serif;cursor:pointer}
+.content-font-toolbar button:active{transform:scale(.96)}
+.daily-selected-view .reading-text,.reading-card .reading-text{font-size:var(--reading-font-size)!important;line-height:1.95!important}
+.synax-section-body,.synaxarium-story{font-size:var(--reading-font-size)!important;line-height:1.95!important}
+.prayer-section-body,.prayer-single-text,.prayer-text,.local-prayer-pages{font-size:var(--reading-font-size)!important;line-height:1.95!important}
+.prayer-font-toolbar{margin-top:10px}
+.menu-card .icon{font-size:calc(40px * var(--app-icon-scale))!important}
+.prayer-big-icon{font-size:calc(52px * var(--app-icon-scale))!important}
+.home-nav-item span{font-size:calc(25px * var(--app-icon-scale))!important}
+.main-header .home-theme-btn{font-size:calc(24px * var(--app-icon-scale))!important}
+@media(max-width:600px){.content-font-toolbar{margin-left:12px;margin-right:12px}.content-font-toolbar button{min-width:38px;height:34px}}
+body.dark .content-font-toolbar{background:#24201d;border-color:#3a322d}body.dark .content-font-toolbar span{color:#b9aca2}body.dark .content-font-toolbar button{background:#352c27;color:#d5b58f}
+
+#katameros-content .reading-text,
+#synaxarium-content .synax-section-body,
+#synaxarium-content .synaxarium-story,
+#prayer-content .prayer-section-body,
+#prayer-content .prayer-text,
+#prayer-content .prayer-single-text,
+#prayer-content .local-prayer-pages,
+#prayer-content .selected-psalm-view .prayer-section-body {
+  font-size: var(--reading-font-size) !important;
 }

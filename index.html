@@ -3,30 +3,59 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>✝️ الكتاب المقدس</title>
+  <title>طريق النور — الأجبية والقطمارس</title>
   <link rel="stylesheet" href="style.css">
   <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- ===== الشاشة الرئيسية ===== -->
   <div id="home-screen" class="screen active">
     <header class="main-header">
-      <h1>✝️ الكتاب المقدس</h1>
-      <p class="subtitle">كلمة الله الحية</p>
+      <div class="main-header-brand">
+        <h1>✝ طريق النور</h1>
+        <p class="subtitle">مكتبة روحية وقراءات يومية</p>
+      </div>
+      <button class="home-theme-btn" type="button" onclick="toggleDarkMode(); updateSettingsUI()" aria-label="الوضع الليلي">🌙</button>
     </header>
 
+    <main class="home-content">
+      <h2 class="home-title">الرئيسية</h2>
+
+      <section class="home-daily-card" aria-label="آية اليوم">
+        <div class="home-daily-label">آية اليوم</div>
+        <div id="home-daily-text" class="home-daily-text"></div>
+        <div id="home-daily-ref" class="home-daily-ref"></div>
+        <div class="home-daily-actions">
+          <button type="button" class="home-action-btn" onclick="saveHomeDailyVerse()">☆ حفظ</button>
+          <button type="button" class="home-action-btn" onclick="shareHomeDailyVerse()">↗ مشاركة</button>
+        </div>
+      </section>
+
+      <h2 class="home-section-title">الأقسام</h2>
+
     <div class="menu-grid">
-      <div class="menu-card" onclick="openTestament('old')">
-        <div class="icon">📜</div>
-        <h3>العهد القديم</h3>
-        <p>39 سفر</p>
+      <div class="menu-card featured-card" onclick="openBibleMenu()">
+        <div class="icon">📖</div>
+        <h3>الكتاب المقدس</h3>
+        <p>العهد القديم والجديد</p>
       </div>
 
-      <div class="menu-card" onclick="openTestament('new')">
-        <div class="icon">✝️</div>
-        <h3>العهد الجديد</h3>
-        <p>27 سفر</p>
+      <div class="menu-card featured-card prayer-home-card" onclick="openAgpeya()">
+        <div class="icon">🙏</div>
+        <h3>الأجبية</h3>
+        <p>صلوات الساعات</p>
+      </div>
+
+      <div class="menu-card daily-service-card" onclick="openKatameros()">
+        <div class="icon">📜</div>
+        <h3>القطمارس اليوم</h3>
+        <p>قراءات الكنيسة اليومية</p>
+      </div>
+
+      <div class="menu-card daily-service-card" onclick="openSynaxarium()">
+        <div class="icon">🕊️</div>
+        <h3>السنكسار اليومي</h3>
+        <p>قديسو وذكريات اليوم</p>
       </div>
 
       <div class="menu-card" onclick="showDailyVerse()">
@@ -61,10 +90,102 @@
     </div>
 
     <footer class="migo-footer">القائمة الرئيسية صنع بواسطة <strong>ميجو</strong></footer>
+    </main>
+
+    <nav class="home-bottom-nav" aria-label="التنقل الرئيسي">
+      <button type="button" class="home-nav-item active" onclick="goHome()"><span>⌂</span><small>الرئيسية</small></button>
+      <button type="button" class="home-nav-item" onclick="openBibleMenu()"><span>📖</span><small>الكتاب</small></button>
+      <button type="button" class="home-nav-item" onclick="openKatameros()"><span>⛪</span><small>القطمارس</small></button>
+      <button type="button" class="home-nav-item" onclick="openAgpeya()"><span>🙏</span><small>الأجبية</small></button>
+      <button type="button" class="home-nav-item" onclick="showFavorites()"><span>⭐</span><small>المفضلة</small></button>
+    </nav>
+  </div>
+
+
+  <div id="bible-menu-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>الكتاب المقدس 📖</h2>
+      <span></span>
+    </header>
+    <div class="menu-grid inner-menu-grid">
+      <div class="menu-card" onclick="openTestament('old')">
+        <div class="icon">📜</div>
+        <h3>العهد القديم</h3>
+        <p>39 سفر</p>
+      </div>
+      <div class="menu-card" onclick="openTestament('new')">
+        <div class="icon">✝️</div>
+        <h3>العهد الجديد</h3>
+        <p>27 سفر</p>
+      </div>
     </div>
   </div>
 
-  <!-- ===== شاشة الأسفار ===== -->
+  <div id="katameros-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>القطمارس اليوم 📜</h2>
+      <span></span>
+    </header>
+    <div class="daily-content">
+      <div class="content-font-toolbar" aria-label="حجم خط القطمارس">
+        <span>حجم الخط</span>
+        <button type="button" onclick="changeReadingFontSize(-1)" aria-label="تصغير الخط">A−</button>
+        <button type="button" onclick="changeReadingFontSize(1)" aria-label="تكبير الخط">A+</button>
+      </div>
+      <div id="katameros-date" class="daily-date"></div>
+      <div id="katameros-content" class="daily-reading-list">
+        <div class="loading-card">جاري تحميل قراءات اليوم من الإنترنت…</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="synaxarium-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>السنكسار اليومي 🕊️</h2>
+      <span></span>
+    </header>
+    <div class="daily-content">
+      <div class="content-font-toolbar" aria-label="حجم خط السنكسار">
+        <span>حجم الخط</span>
+        <button type="button" onclick="changeReadingFontSize(-1)" aria-label="تصغير الخط">A−</button>
+        <button type="button" onclick="changeReadingFontSize(1)" aria-label="تكبير الخط">A+</button>
+      </div>
+      <div id="synaxarium-date" class="daily-date"></div>
+      <div id="synaxarium-content" class="synaxarium-content">
+        <div class="loading-card">جاري تحميل سنكسار اليوم من الإنترنت…</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="agpeya-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="goHome()">→</button>
+      <h2>الأجبية 🙏</h2>
+      <span></span>
+    </header>
+    <div class="agpeya-container">
+      <p class="agpeya-intro">صلوات الساعات اليومية</p>
+      <div id="agpeya-list" class="agpeya-list"></div>
+    </div>
+  </div>
+
+  <div id="prayer-screen" class="screen">
+    <header class="top-bar">
+      <button onclick="openAgpeya()">→</button>
+      <h2 id="prayer-title">صلاة باكر</h2>
+      <span></span>
+    </header>
+    <div class="content-font-toolbar prayer-font-toolbar" aria-label="حجم خط الأجبية">
+      <span>حجم الخط</span>
+      <button type="button" onclick="changeReadingFontSize(-1)" aria-label="تصغير الخط">A−</button>
+      <button type="button" onclick="changeReadingFontSize(1)" aria-label="تكبير الخط">A+</button>
+    </div>
+    <div id="prayer-content" class="prayer-content"></div>
+  </div>
+
   <div id="books-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -74,7 +195,6 @@
     <div id="books-list" class="books-list"></div>
   </div>
 
-  <!-- ===== شاشة الإصحاحات ===== -->
   <div id="chapters-screen" class="screen">
     <header class="top-bar">
       <button onclick="backToBooks()">→</button>
@@ -84,7 +204,6 @@
     <div id="chapters-grid" class="chapters-grid"></div>
   </div>
 
-  <!-- ===== شاشة القراءة ===== -->
   <div id="reading-screen" class="screen">
     <header class="top-bar">
       <button onclick="backToChapters()">→</button>
@@ -99,7 +218,6 @@
       <button onclick="changeFontSize(1)">A+</button>
     </div>
 
-    <!-- ===== شريط التقدم الصوتي ===== -->
     <div id="audio-progress-bar" class="audio-progress-bar">
       <div class="audio-info">
         <span id="audio-time-current">0:00</span>
@@ -115,7 +233,6 @@
     <div id="verses-container" class="verses-container"></div>
   </div>
 
-  <!-- ===== شاشة آية اليوم ===== -->
   <div id="daily-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -126,11 +243,11 @@
       <div class="sun-icon">🌞</div>
       <p id="daily-text" class="daily-text"></p>
       <p id="daily-ref" class="daily-ref"></p>
+      <small class="daily-cycle-note">آية جديدة كل يوم — دورة 700 يوم</small>
       <button class="share-btn" onclick="shareVerse()">📤 مشاركة</button>
     </div>
   </div>
 
-  <!-- ===== شاشة المفضلة ===== -->
   <div id="favorites-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -140,7 +257,6 @@
     <div id="favorites-list" class="favorites-list"></div>
   </div>
 
-  <!-- ===== شاشة البحث ===== -->
   <div id="search-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -153,7 +269,6 @@
     <div id="search-results" class="search-results"></div>
   </div>
 
-  <!-- ===== شاشة الإعدادات والتواصل ===== -->
   <div id="settings-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -181,6 +296,16 @@
             <button class="setting-action" onclick="changeFontSize(1); updateSettingsUI()">A+</button>
           </div>
         </div>
+        <div class="setting-row">
+          <div>
+            <strong>حجم الأيقونات</strong>
+            <p id="settings-icon-size">100%</p>
+          </div>
+          <div class="font-actions">
+            <button class="setting-action" onclick="changeIconSize(-1); updateSettingsUI()" aria-label="تصغير الأيقونات">−</button>
+            <button class="setting-action" onclick="changeIconSize(1); updateSettingsUI()" aria-label="تكبير الأيقونات">+</button>
+          </div>
+        </div>
       </section>
 
       <section class="contact-card">
@@ -197,7 +322,6 @@
     </div>
   </div>
 
-  <!-- ===== شاشة خطة القراءة ===== -->
   <div id="plan-screen" class="screen">
     <header class="top-bar">
       <button onclick="goHome()">→</button>
@@ -211,6 +335,7 @@
   </div>
 
   <script src="data.js"></script>
+  <script src="agpeya_text.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
