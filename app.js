@@ -47,7 +47,6 @@ function openBibleMenu() {
 }
 
 const COPTIC_API = 'https://api.coptic.io/api';
-const KATAMEROS_API = 'https://api.katameros.app';
 
 const agpeyaPrayers = [
   {id:'matins', icon:'🌅', title:'صلاة باكر', subtitle:'صلاة الساعة الأولى', pages:20},
@@ -249,6 +248,14 @@ function splitPsalms(text) {
   return out;
 }
 
+function getPsalmDisplayName(psalm) {
+  const raw = (psalm && psalm.text ? psalm.text : '').split('\n').map(x => x.trim()).filter(Boolean).join(' ');
+  if (!raw) return psalm && psalm.title ? psalm.title : 'المزمور';
+  const firstSentence = raw.match(/^(.+?[.!؟؛])(?:\s|$)/);
+  const name = firstSentence ? firstSentence[1] : raw;
+  return name.length > 180 ? name.slice(0, 177).trimEnd() + '…' : name;
+}
+
 function renderPsalmPart(part) {
   const view = document.getElementById('prayer-part-view');
   if (!view) return;
@@ -265,7 +272,7 @@ function renderPsalmPart(part) {
     <div class="psalm-picker-box">
       <label for="psalm-select">اختر المزمور</label>
       <select id="psalm-select" class="psalm-select">
-        ${psalms.map((p,i)=>`<option value="${i}">${escapeHtml(p.title)}</option>`).join('')}
+        ${psalms.map((p,i)=>`<option value="${i}">${escapeHtml(getPsalmDisplayName(p))}</option>`).join('')}
       </select>
     </div>
     <div id="selected-psalm-view" class="selected-psalm-view"></div>`;
@@ -287,7 +294,7 @@ function showPsalm(index) {
   window.__selectedPsalm = index;
   const view = document.getElementById('selected-psalm-view');
   if (!view) return;
-  view.innerHTML = `<div class="prayer-section-title">${escapeHtml(item.title)}</div><div class="prayer-section-body">${escapeHtml(item.text).replace(/\n/g,'<br>')}</div>`;
+  view.innerHTML = `<div class="prayer-section-title">${escapeHtml(getPsalmDisplayName(item))}</div><div class="prayer-section-body">${escapeHtml(item.text).replace(/\n/g,'<br>')}</div>`;
 }
 
 function renderLocalPrayerPart(part) {
@@ -393,35 +400,125 @@ async function openKatameros() {
   showScreen('katameros-screen');
   const date = todayISO();
   const copticLabel = copticTodayLabel(date);
-  document.getElementById('katameros-date').textContent = copticLabel || 'قراءات اليوم';
-  document.getElementById('katameros-content').innerHTML = '<div class="loading-card">جاري تحميل القطمارس الحقيقي بالعربية…</div>';
+  const dateEl = document.getElementById('katameros-date');
+  const root = document.getElementById('katameros-content');
+  if (dateEl) dateEl.textContent = copticLabel || 'قراءات اليوم';
+  if (root) root.innerHTML = '<div class="loading-card">جاري تحميل القطمارس بالعربية…</div>';
 
-  const day = date.slice(8,10), month = date.slice(5,7), year = date.slice(0,4);
-  const sources = [
-    `https://r.jina.ai/https://www.ayakolyoum.com/public/katamaros?date=${date}`,
-    `https://www.ayakolyoum.com/public/katamaros?date=${date}`,
-    `https://r.jina.ai/https://www.copticchurch.net/readings/ar?g_day=${day}&g_month=${month}&g_year=${year}`,
-    `https://www.copticchurch.net/readings/ar?g_day=${day}&g_month=${month}&g_year=${year}`,
-    `https://r.jina.ai/https://st-takla.org/zJ/index.php/component/katamaros/?dbl=ar&iday=${day}&imonth=${month}&iyear=${year}&view=reading-arabic`,
-    `https://st-takla.org/zJ/index.php/component/katamaros/?dbl=ar&iday=${day}&imonth=${month}&iyear=${year}&view=reading-arabic`
-  ];
-
-  for (const url of sources) {
-    try {
-      const html = await fetchText([url]);
-      if (renderKatamerosArabicHtml(html)) return;
-    } catch (e) { console.warn('Katameros source failed', url, e); }
-  }
+  const [year, month, day] = date.split('-');
+  // مصدر القراءات واحد: elmaqar.org. نستخدم r.jina.ai فقط كوسيط لجلب الصفحة
+  // من المتصفح عندما يمنع المتصفح طلبات CORS؛ المحتوى نفسه من elmaqar.org.
+  const source = `https://r.jina.ai/https://readings.elmaqar.org/readings/index.php?Itemid=2&option=com_reading&iday=${day}&imonth=${month}&iyear=${year}`;
 
   try {
-    const data = await fetchJson([
-      `${COPTIC_API}/readings/${date}?detailed=true&lang=ar`,
-      `${KATAMEROS_API}/readings/gregorian/${date.split('-').reverse().join('-')}?languageId=3&bibleId=3`
-    ]);
-    renderKatameros(data);
+    const html = await fetchText([source]);
+    const ok = renderElmaqarKatameros(html);
+    if (!ok) throw new Error('لم يتم العثور على قراءات القطمارس في الصفحة');
   } catch (e) {
-    showOnlineError('katameros-content', 'تعذر تحميل قراءات القطمارس بالعربية من المصادر المتاحة.');
+    console.warn('Katameros load failed', e);
+    showOnlineError('katameros-content', 'تعذر تحميل القطمارس الآن. تأكد من الإنترنت ثم اضغط إعادة المحاولة.');
   }
+}
+
+function renderElmaqarKatameros(html) {
+  const raw = htmlToReadableText(html)
+    .replace(/\r/g, '\n')
+    .replace(/[\u200e\u200f\u202a-\u202e]/g, '')
+    .replace(/\u00a0/g, ' ');
+  const lines = raw.split('\n').map(x => x.trim()).filter(Boolean);
+
+  const aliases = {
+    'مزمور العشية':'مزمور العشية','مزمور عشية':'مزمور العشية',
+    'إنجيل العشية':'إنجيل العشية','انجيل العشية':'إنجيل العشية','إنجيل عشية':'إنجيل العشية','انجيل عشية':'إنجيل العشية',
+    'مزمور باكر':'مزمور باكر','مزمو باكر':'مزمور باكر','مزمور باكر':'مزمور باكر',
+    'إنجيل باكر':'إنجيل باكر','انجيل باكر':'إنجيل باكر',
+    'مزمور القداس':'مزمور القداس','إنجيل القداس':'إنجيل القداس','انجيل القداس':'إنجيل القداس',
+    'البولس':'البولس','الكاثوليكون':'الكاثوليكون','أعمال الرسل':'الإبركسيس','الإبركسيس':'الإبركسيس','الابركسيس':'الإبركسيس'
+  };
+  const order = ['مقدمة العشية','مزمور العشية','إنجيل العشية','مقدمة باكر','مزمور باكر','إنجيل باكر','البولس','الكاثوليكون','الإبركسيس','مقدمة القداس','مزمور القداس','إنجيل القداس'];
+  const parts = [];
+  let service = '';
+  let current = null;
+  let inSynaxarium = false;
+
+  const push = () => {
+    if (!current) return;
+    const text = current.text.trim();
+    if (text.length > 1) parts.push({title: current.title, text});
+    current = null;
+  };
+  const introFor = s => s === 'vespers' ? 'مقدمة العشية' : s === 'matins' ? 'مقدمة باكر' : 'مقدمة القداس';
+  const setSection = line => {
+    if (line === 'العشية') return 'vespers';
+    if (line === 'باكر') return 'matins';
+    if (line === 'قراءات القداس' || line === 'القداس' || line === 'القداس الإلهي') return 'liturgy';
+    return '';
+  };
+  const titleFor = line => {
+    if (aliases[line]) return aliases[line];
+    if (line === 'مزمور' || line === 'المزمور') return service === 'vespers' ? 'مزمور العشية' : service === 'matins' ? 'مزمور باكر' : 'مزمور القداس';
+    if (line === 'إنجيل' || line === 'الإنجيل') return service === 'vespers' ? 'إنجيل العشية' : service === 'matins' ? 'إنجيل باكر' : 'إنجيل القداس';
+    return '';
+  };
+
+  for (const line0 of lines) {
+    const line = line0.replace(/^#+\s*/, '').trim();
+    if (!line) continue;
+
+    if (/^(السنكسار|سنكسار|السنكسار اليومي|سنكسار اليومي)$/.test(line)) {
+      push();
+      inSynaxarium = true;
+      continue;
+    }
+    if (inSynaxarium) {
+      if (/^(القداس الإلهي|القداس|قراءات القداس)$/.test(line)) {
+        inSynaxarium = false;
+        service = 'liturgy';
+        current = {title:'مقدمة القداس', text:''};
+      }
+      continue;
+    }
+
+    const section = setSection(line);
+    if (section) {
+      push();
+      service = section;
+      current = {title:introFor(service), text:''};
+      continue;
+    }
+
+    const title = titleFor(line);
+    if (title) {
+      push();
+      current = {title, text:''};
+      continue;
+    }
+
+    if (/^(View in Arabic text|القراءات اليومية|Prev\. day|Next day|اختيار|السابق|التالي|أعلى الصفحة|Acknowledgement|Readings - AR|Readings - EN)$/i.test(line)) continue;
+    if (/^\*+$/.test(line)) continue;
+    if (/^قراءات\s+/.test(line) && !/القداس/.test(line)) continue;
+
+    if (current) current.text += (current.text ? '\n' : '') + line;
+  }
+  push();
+
+  // إزالة أي نص سنكسار/ملاحة تسلل إلى البطاقات، ثم دمج العناوين المكررة.
+  const seen = new Set();
+  const clean = parts.filter(p => {
+    if (!p.text || seen.has(p.title)) return false;
+    seen.add(p.title);
+    return true;
+  });
+
+  // لا نعرض أي بطاقة خارج الترتيب المطلوب.
+  const finalParts = order.map(t => clean.find(p => p.title === t)).filter(Boolean);
+  if (!finalParts.some(p => p.title === 'مزمور العشية') ||
+      !finalParts.some(p => p.title === 'إنجيل العشية') ||
+      !finalParts.some(p => p.title === 'مزمور القداس') ||
+      !finalParts.some(p => p.title === 'إنجيل القداس')) return false;
+
+  renderKatamerosParts(finalParts);
+  return true;
 }
 
 function normalizeReadingLabel(t) {
@@ -448,15 +545,23 @@ function katamerosStructuredParts(lines) {
   let current=null;
   const push=()=>{ if(current && current.text.trim().length>1) parts.push(current); current=null; };
   const titleMap = {
-    'مزمور العشية':'مزمور العشية','إنجيل العشية':'إنجيل العشية','الإنجيل العشية':'إنجيل العشية',
-    'مزمور باكر':'مزمور باكر','إنجيل باكر':'إنجيل باكر','الإنجيل باكر':'إنجيل باكر',
+    'مزمور العشية':'مزمور العشية','مزمور عشية':'مزمور العشية','إنجيل العشية':'إنجيل العشية','إنجيل عشية':'إنجيل العشية','انجيل عشية':'إنجيل العشية','الإنجيل العشية':'إنجيل العشية',
+    'مزمور باكر':'مزمور باكر','إنجيل باكر':'إنجيل باكر','انجيل باكر':'إنجيل باكر','الإنجيل باكر':'إنجيل باكر',
     'مزمور القداس':'مزمور القداس','إنجيل القداس':'إنجيل القداس',
     'البولس':'البولس','الكاثوليكون':'الكاثوليكون','الإبركسيس':'الإبركسيس','الابركسيس':'الإبركسيس',
     'مقدمة العشية':'مقدمة العشية','مقدمة باكر':'مقدمة باكر','مقدمة القداس':'مقدمة القداس'
   };
   let section='';
+  let ignoreAfterSynaxarium=false;
   for (let i=0;i<clean.length;i++) {
     const line=clean[i];
+    if (/^(السنكسار|سنكسار|السنكسار اليومي|سنكسار اليومي)$/.test(line)) {
+      push();
+      section='';
+      ignoreAfterSynaxarium=true;
+      continue;
+    }
+    if (ignoreAfterSynaxarium) continue;
     if (line==='العشية') { push(); section='vespers'; continue; }
     if (line==='باكر') { push(); section='matins'; continue; }
     if (line==='القداس' || line==='القداس الإلهي') { push(); section='liturgy'; continue; }
@@ -503,14 +608,22 @@ function katamerosStructuredParts(lines) {
 function katamerosLegacyParts(lines) {
   const clean=lines.map(x=>String(x||'').replace(/\s+/g,' ').trim()).filter(Boolean);
   const aliases={
-    'مزمور العشية':'مزمور العشية','إنجيل العشية':'إنجيل العشية','الإنجيل العشية':'إنجيل العشية',
-    'مزمور باكر':'مزمور باكر','إنجيل باكر':'إنجيل باكر','الإنجيل باكر':'إنجيل باكر',
+    'مزمور العشية':'مزمور العشية','مزمور عشية':'مزمور العشية','إنجيل العشية':'إنجيل العشية','إنجيل عشية':'إنجيل العشية','انجيل عشية':'إنجيل العشية','الإنجيل العشية':'إنجيل العشية',
+    'مزمور باكر':'مزمور باكر','إنجيل باكر':'إنجيل باكر','انجيل باكر':'إنجيل باكر','الإنجيل باكر':'إنجيل باكر',
     'البولس':'البولس','الكاثوليكون':'الكاثوليكون','الإبركسيس':'الإبركسيس','الابركسيس':'الإبركسيس',
     'مزمور القداس':'مزمور القداس','إنجيل القداس':'إنجيل القداس'
   };
   const titles=Object.keys(aliases);
   const out=[]; let current=null;
+  let ignoreAfterSynaxarium=false;
   for(const line of clean){
+    if (/^(السنكسار|سنكسار|السنكسار اليومي|سنكسار اليومي)$/.test(line)) {
+      if(current&&current.text.trim()) out.push(current);
+      current=null;
+      ignoreAfterSynaxarium=true;
+      continue;
+    }
+    if (ignoreAfterSynaxarium) continue;
     const hit=titles.find(x=>line===x);
     if(hit){ if(current&&current.text.trim()) out.push(current); current={title:aliases[hit],text:''}; }
     else if(current && !/^(القطمارس|قراءات اليوم|نسخ القراءة|نسخ الكل|English|العربية|التاريخ|المناسبة)$/i.test(line)) current.text+=(current.text?'\n':'')+line;
@@ -522,25 +635,47 @@ function katamerosLegacyParts(lines) {
 function renderKatamerosParts(parts) {
   const root = document.getElementById('katameros-content');
   if (!root || !parts.length) return false;
+
   const order=['مقدمة العشية','مزمور العشية','إنجيل العشية','مقدمة باكر','مزمور باكر','إنجيل باكر','البولس','الكاثوليكون','الإبركسيس','مقدمة القداس','مزمور القداس','إنجيل القداس'];
-  const items=parts.map((p,i)=>({...p})).sort((a,b)=>{
-    const ai=order.indexOf(a.title), bi=order.indexOf(b.title);
-    return (ai<0?999:ai)-(bi<0?999:bi);
-  }).map((p,i)=>({...p,id:`katameros-part-${i}`}));
+  const rank = title => {
+    const i=order.indexOf(title);
+    return i<0 ? 999 : i;
+  };
+
+  const items=[];
+  const seenTitles=new Set();
+  parts.map(p=>({...p}))
+    .sort((a,b)=>rank(a.title)-rank(b.title))
+    .forEach(p=>{
+      if (!p.text || !looksArabic(p.text)) return;
+      if (seenTitles.has(p.title)) return;
+      seenTitles.add(p.title);
+      items.push(p);
+    });
+
   if (!items.length) return false;
+
+  // عرض القطمارس بنظام زر اختيار واحد، بدل إظهار كل القراءات دفعة واحدة.
   root.innerHTML=`
     <div class="daily-selector-wrap">
       <button type="button" class="daily-selector-btn" onclick="toggleDailyPicker('katameros')" aria-expanded="false">
-        <span id="katameros-selected-label">${escapeHtml(items[0].title)}</span><span>⌄</span>
+        <span id="katameros-selected-label">${escapeHtml(items[0].title)}</span>
+        <span class="prayer-selector-arrow">⌄</span>
       </button>
     </div>
     <div id="katameros-part-view" class="daily-selected-view"></div>
     <div id="katameros-picker" class="daily-picker-overlay" onclick="closeDailyPicker('katameros',event)" aria-hidden="true">
       <div class="daily-picker" onclick="event.stopPropagation()">
-        <div class="daily-picker-head"><strong>اختر جزء القطمارس</strong><button type="button" onclick="toggleDailyPicker('katameros')">×</button></div>
-        <div class="daily-choice-list">${items.map((p,i)=>`<button type="button" class="daily-choice" onclick="showKatamerosPart(${i})"><span>${escapeHtml(p.title)}</span></button>`).join('')}</div>
+        <div class="daily-picker-head">
+          <strong>اختر قراءة القطمارس</strong>
+          <button type="button" onclick="toggleDailyPicker('katameros')">×</button>
+        </div>
+        <div class="daily-choice-list">
+          ${items.map((p,i)=>`<button type="button" class="daily-choice" onclick="showKatamerosPart(${i})"><span>${escapeHtml(p.title)}</span></button>`).join('')}
+        </div>
       </div>
     </div>`;
+
   window.__katamerosParts=items;
   window.__selectedKatamerosPart=0;
   showKatamerosPart(0,false);
@@ -587,12 +722,32 @@ function renderKatamerosArabicHtml(html) {
   const raw = (root.innerText || root.textContent || '')
     .replace(/\u00a0/g, ' ')
     .replace(/[\u200e\u200f\u202a-\u202e]/g, '');
-  const lines = raw.split(/\n+/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  const lines = raw.split(/\n+/).map(x => x
+    .replace(/^[#*\-•]+\s*/,'')
+    .replace(/\*\*(.*?)\*\*/g,'$1')
+    .replace(/__(.*?)__/g,'$1')
+    .replace(/\[(.*?)\]\([^)]*\)/g,'$1')
+    .replace(/\s+/g,' ')
+    .trim()
+  ).filter(Boolean);
+  const normalizedLines = lines.flatMap(x => {
+    let line = x.replace(/^مزمور\s+عشية$/, 'مزمور العشية')
+      .replace(/^(إنجيل|انجيل)\s+عشية$/, 'إنجيل العشية')
+      .replace(/^(إنجيل|انجيل)\s+باكر$/, 'إنجيل باكر')
+      .replace(/^(مزمور|مزمر)\s+باكر$/, 'مزمور باكر')
+      .replace(/^مقدمة\s+(إنجيل|انجيل)\s+(العشية|عشية)$/, 'مقدمة العشية');
+    // بعض المصادر تلصق عنوان القسم بنهاية السطر السابق.
+    line = line.replace(/\s+(القداس(?:\s+الإلهي)?)(?=\s|$)/g, '\n$1')
+      .replace(/(إنجيل عشية|مزمور عشية|إنجيل العشية|مزمور العشية|إنجيل باكر|مزمور باكر|إنجيل القداس|مزمور القداس|السنكسار اليومي|السنكسار|سنكسار اليومي|سنكسار)\s*[:：-]?/g, '\n$1\n')
+      .replace(/\n+/g, '\n');
+    return line.split(/\n+/).map(y => y.trim()).filter(Boolean);
+  });
 
   const aliases = {
-    'مزمور العشية':'مزمور العشية', 'إنجيل العشية':'إنجيل العشية', 'الإنجيل العشية':'إنجيل العشية',
-    'مزمور باكر':'مزمور باكر', 'إنجيل باكر':'إنجيل باكر', 'الإنجيل باكر':'إنجيل باكر',
-    'مزمور القداس':'مزمور القداس', 'إنجيل القداس':'إنجيل القداس', 'الإنجيل القداس':'إنجيل القداس',
+    'مزمور العشية':'مزمور العشية', 'مزمور عشية':'مزمور العشية', 'مزمر عشية':'مزمور العشية', 'الإنجيل العشية':'إنجيل العشية', 'إنجيل العشية':'إنجيل العشية', 'إنجيل عشية':'إنجيل العشية', 'انجيل عشية':'إنجيل العشية',
+    'مقدمة انجيل عشية':'مقدمة العشية', 'مقدمة إنجيل عشية':'مقدمة العشية', 'مقدمة الإنجيل عشية':'مقدمة العشية', 'مقدمة إنجيل العشية':'مقدمة العشية', 'مقدمة عشية':'مقدمة العشية',
+    'مزمور باكر':'مزمور باكر', 'مزمور باكر':'مزمور باكر', 'إنجيل باكر':'إنجيل باكر', 'انجيل باكر':'إنجيل باكر', 'الإنجيل باكر':'إنجيل باكر',
+    'مزمور القداس':'مزمور القداس', 'إنجيل القداس':'إنجيل القداس', 'انجيل القداس':'إنجيل القداس', 'الإنجيل القداس':'إنجيل القداس',
     'البولس':'البولس', 'الكاثوليكون':'الكاثوليكون',
     'الإبركسيس':'الإبركسيس', 'الابركسيس':'الإبركسيس'
   };
@@ -606,12 +761,12 @@ function renderKatamerosArabicHtml(html) {
     return service;
   };
   const titleFor = (name) => {
-    if (name === 'مزمور' || name === 'المزمور') return service === 'vespers' ? 'مزمور العشية' : service === 'matins' ? 'مزمور باكر' : 'مزمور القداس';
-    if (name === 'إنجيل' || name === 'الإنجيل') return service === 'vespers' ? 'إنجيل العشية' : service === 'matins' ? 'إنجيل باكر' : 'إنجيل القداس';
+    if (name === 'مزمور' || name === 'المزمور' || name === 'مزمور عشية') return service === 'vespers' ? 'مزمور العشية' : service === 'matins' ? 'مزمور باكر' : 'مزمور القداس';
+    if (name === 'إنجيل' || name === 'الإنجيل' || name === 'إنجيل عشية' || name === 'انجيل عشية') return service === 'vespers' ? 'إنجيل العشية' : service === 'matins' ? 'إنجيل باكر' : 'إنجيل القداس';
     return aliases[name] || name;
   };
   const isHeading = line => {
-    if (aliases[line] || ['العشية','باكر','القداس','القداس الإلهي','قراءات القداس','مزمور','المزمور','إنجيل','الإنجيل'].includes(line)) return true;
+    if (aliases[line] || ['العشية','باكر','القداس','القداس الإلهي','قراءات القداس','مزمور','المزمور','مزمور عشية','إنجيل','الإنجيل','إنجيل عشية','انجيل عشية'].includes(line)) return true;
     return false;
   };
   const pushCurrent = () => {
@@ -637,7 +792,23 @@ function renderKatamerosArabicHtml(html) {
     current = null;
   };
 
-  for (const line of lines) {
+  let inSynaxarium=false;
+  for (const line of normalizedLines) {
+    if (/^(السنكسار|سنكسار|السنكسار اليومي|سنكسار اليومي)$/.test(line)) {
+      pushCurrent();
+      service='';
+      inSynaxarium=true;
+      continue;
+    }
+    if (inSynaxarium) {
+      if (line === 'القداس' || line === 'القداس الإلهي' || line === 'قراءات القداس') {
+        inSynaxarium=false;
+        pushCurrent();
+        service = 'liturgy';
+        continue;
+      }
+      continue;
+    }
     if (line === 'العشية' || line === 'باكر' || line === 'القداس' || line === 'القداس الإلهي' || line === 'قراءات القداس') {
       pushCurrent();
       service = serviceName(line);
@@ -648,7 +819,7 @@ function renderKatamerosArabicHtml(html) {
       current = {title:titleFor(line), text:''};
       continue;
     }
-    const inline = line.match(/^(مزمور العشية|إنجيل العشية|مزمور باكر|إنجيل باكر|البولس|الكاثوليكون|الإبركسيس|الابركسيس|مزمور القداس|إنجيل القداس)\s*[:：-]?\s*(.*)$/);
+    const inline = line.match(/^(مقدمة انجيل عشية|مقدمة إنجيل عشية|مقدمة الإنجيل عشية|مقدمة إنجيل العشية|مقدمة عشية|مزمور العشية|مزمور عشية|مزمر عشية|إنجيل العشية|إنجيل عشية|انجيل عشية|مزمور باكر|مزمر باكر|إنجيل باكر|انجيل باكر|البولس|الكاثوليكون|الإبركسيس|الابركسيس|مزمور القداس|إنجيل القداس|انجيل القداس)\s*[:：-]?\s*(.*)$/);
     if (inline) {
       pushCurrent();
       current = {title:aliases[inline[1]] || inline[1], text:inline[2] || ''};
@@ -664,13 +835,19 @@ function renderKatamerosArabicHtml(html) {
   const seen = new Set();
   const clean = parts.filter(p => {
     const text = String(p.text || '').trim();
-    const key = p.title + '|' + text;
-    if (!text || text.length < 2 || seen.has(key)) return false;
-    seen.add(key); return true;
+    const title = String(p.title || '').trim();
+    if (!text || text.length < 2 || !title || seen.has(title)) return false;
+    seen.add(title);
+    return true;
   });
 
+  const hasVespers = clean.some(p => /عشية/.test(p.title));
+  if (!hasVespers) {
+    const fallback = katamerosStructuredParts(normalizedLines);
+    if (fallback.some(p => /عشية/.test(p.title))) return renderKatamerosParts(fallback);
+  }
   if (!clean.length) {
-    const fallback = katamerosStructuredParts(lines);
+    const fallback = katamerosStructuredParts(normalizedLines);
     if (fallback.length) return renderKatamerosParts(fallback);
     return false;
   }
@@ -683,33 +860,130 @@ const readingNamesAr = {
 
 function renderKatameros(data) {
   const root=document.getElementById('katameros-content');
-  const parts=[]; const used=new Set();
-  function add(title,value){
-    const text=stripHtml(value).trim();
-    if(!text||text.length<2||!looksArabic(text)) return;
-    const key=title+'|'+text;
-    if(used.has(key)) return;
-    used.add(key); parts.push({title:title||'قراءة',text});
+  if (!root) return false;
+
+  const order=['مقدمة العشية','مزمور العشية','إنجيل العشية','مقدمة باكر','مزمور باكر','إنجيل باكر','البولس','الكاثوليكون','الإبركسيس','مقدمة القداس','مزمور القداس','إنجيل القداس'];
+  const parts=[];
+  const usedTitles=new Set();
+  const seenText=new Set();
+
+  const cleanText = value => {
+    const t = stripHtml(String(value ?? ''))
+      .replace(/[\\r\\t]+/g,' ')
+      .replace(/\\s{2,}/g,' ')
+      .trim();
+    return t;
+  };
+
+  const normalizeKey = key => String(key || '')
+    .toLowerCase()
+    .replace(/[\\s_\\-]+/g,'')
+    .replace(/[إأآ]/g,'ا');
+
+  function sectionOf(key, current='') {
+    const k=normalizeKey(key);
+    if (/vespers|evening|عشية|مساء|غروب/.test(k)) return 'vespers';
+    if (/matins|morning|باكر|باکر/.test(k)) return 'matins';
+    if (/liturgy|divineliturgy|mass|قداس/.test(k)) return 'liturgy';
+    return current;
   }
-  function walk(v,key='',section=''){
-    if(v==null) return;
-    const k=String(key||'').toLowerCase();
-    let title=readingNamesAr[k]||(looksArabic(key)?key:'');
-    if(/pauline|بولس/.test(k)) title='البولس';
-    else if(/cath|كاثولي/.test(k)) title='الكاثوليكون';
-    else if(/praxis|acts|ابركسيس|إبركسيس/.test(k)) title='الإبركسيس';
-    else if(/psalm/.test(k)) title=section==='liturgy'?'مزمور القداس':section==='vespers'?'مزمور العشية':section==='matins'?'مزمور باكر':'المزمور';
-    else if(/gospel/.test(k)) title=section==='liturgy'?'إنجيل القداس':section==='vespers'?'إنجيل العشية':section==='matins'?'إنجيل باكر':'الإنجيل';
-    if(typeof v==='string'||typeof v==='number'){ add(title,v); return; }
-    if(Array.isArray(v)){v.forEach(x=>walk(x,key,section));return;}
-    if(typeof v==='object') Object.entries(v).forEach(([k2,val])=>{
-      const sec=/vespers|عشية/.test(String(k2).toLowerCase())?'vespers':/matins|باكر/.test(String(k2).toLowerCase())?'matins':/liturgy|قداس/.test(String(k2).toLowerCase())?'liturgy':section;
-      walk(val,k2,sec);
+
+  function titleOf(key, section='') {
+    const k=normalizeKey(key);
+    if (/pauline|paulineepistle|بولس/.test(k)) return 'البولس';
+    if (/catholic|catholicon|catholiconepistle|كاثولي/.test(k)) return 'الكاثوليكون';
+    if (/praxis|acts|ابركسيس/.test(k)) return 'الإبركسيس';
+    if (/psalm|psalms|مزمور|مزمر/.test(k)) {
+      return section==='vespers'?'مزمور العشية':section==='matins'?'مزمور باكر':section==='liturgy'?'مزمور القداس':'المزمور';
+    }
+    if (/gospel|انجيل|الانجيل/.test(k)) {
+      return section==='vespers'?'إنجيل العشية':section==='matins'?'إنجيل باكر':section==='liturgy'?'إنجيل القداس':'الإنجيل';
+    }
+    return '';
+  }
+
+  function getArabicValue(obj) {
+    if (obj == null) return '';
+    if (typeof obj === 'string' || typeof obj === 'number') {
+      const t=cleanText(obj);
+      return looksArabic(t)?t:'';
+    }
+    if (Array.isArray(obj)) return obj.map(getArabicValue).filter(Boolean).join('\n\n');
+    if (typeof obj !== 'object') return '';
+    for (const k of ['ar','arabic','textAr','arabicText','contentAr','text_ar','content_ar','fullText','text','content','verses']) {
+      if (obj[k] != null) {
+        const t=getArabicValue(obj[k]);
+        if (t) return t;
+      }
+    }
+    return '';
+  }
+
+  function add(title,text) {
+    text=cleanText(text);
+    if (!title || !text || !looksArabic(text)) return;
+    const key=title+'|'+text.slice(0,300);
+    if (seenText.has(key)) return;
+    seenText.add(key);
+    if (usedTitles.has(title)) {
+      const existing=parts.find(p=>p.title===title);
+      if (existing && !existing.text.includes(text)) existing.text += '\n\n' + text;
+      return;
+    }
+    usedTitles.add(title);
+    parts.push({title,text});
+  }
+
+  function walk(value, key='', section='', parentTitle='') {
+    if (value == null) return;
+    const nextSection=sectionOf(key,section);
+    const title=titleOf(key,nextSection) || parentTitle;
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      const t=cleanText(value);
+      if (title && looksArabic(t)) add(title,t);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(v=>walk(v,key,nextSection,title));
+      return;
+    }
+    if (typeof value !== 'object') return;
+
+    // If this object itself is a reading, use its Arabic/full text fields.
+    if (title) {
+      const direct=getArabicValue(value);
+      if (direct && direct.length>20) add(title,direct);
+    }
+
+    for (const [k,v] of Object.entries(value)) {
+      if (/^(id|date|gregorianDate|copticDate|language|slug|url|createdAt|updatedAt)$/i.test(k)) continue;
+      walk(v,k,nextSection,title || '');
+    }
+  }
+
+  walk(data);
+
+  // Some API versions put readings in a flat array with a type/name field.
+  function scanFlat(value, section='') {
+    if (Array.isArray(value)) { value.forEach(v=>scanFlat(v,section)); return; }
+    if (!value || typeof value!=='object') return;
+    const sec=sectionOf(value.section || value.service || value.category || '', section);
+    const rawType=value.type || value.kind || value.name || value.title || value.readingType || '';
+    const title=titleOf(rawType,sec);
+    const text=getArabicValue(value);
+    if (title && text) add(title,text);
+    Object.entries(value).forEach(([k,v])=>{
+      if (['text','content','verses','ar','arabic','arabicText','textAr','contentAr'].includes(k)) return;
+      scanFlat(v,sectionOf(k,sec));
     });
   }
-  walk(data);
-  if(!parts.length){root.innerHTML='<div class="online-error"><h3>لم تظهر قراءات اليوم</h3><p>تمت تجربة المصادر العربية المتاحة للقطمارس.</p></div>';return;}
-  renderKatamerosParts(parts);
+  scanFlat(data);
+
+  // Keep exactly one card per reading and the requested liturgical order.
+  const finalParts=order.map(title=>parts.find(p=>p.title===title)).filter(Boolean);
+  renderKatamerosParts(finalParts);
+  return finalParts.length > 0;
 }
 
 async function openSynaxarium() {
