@@ -46,16 +46,14 @@
         <p>صلوات الساعات</p>
       </div>
 
-      <div class="menu-card daily-service-card" onclick="openKatameros()">
-        <div class="icon">📜</div>
-        <h3>القطمارس اليوم</h3>
-        <p>قراءات الكنيسة اليومية</p>
-      </div>
 
-      <div class="menu-card daily-service-card" onclick="openSynaxarium()">
-        <div class="icon">🕊️</div>
-        <h3>السنكسار اليومي</h3>
-        <p>قديسو وذكريات اليوم</p>
+
+
+
+      <div class="menu-card daily-service-card" onclick="openKholagy()">
+        <div class="icon">⛪</div>
+        <h3>الخولاجي المقدس</h3>
+        <p>الأعياد والمناسبات والصلوات الكنسية</p>
       </div>
 
       <div class="menu-card" onclick="showDailyVerse()">
@@ -95,7 +93,6 @@
     <nav class="home-bottom-nav" aria-label="التنقل الرئيسي">
       <button type="button" class="home-nav-item active" onclick="goHome()"><span>⌂</span><small>الرئيسية</small></button>
       <button type="button" class="home-nav-item" onclick="openBibleMenu()"><span>📖</span><small>الكتاب</small></button>
-      <button type="button" class="home-nav-item" onclick="openKatameros()"><span>⛪</span><small>القطمارس</small></button>
       <button type="button" class="home-nav-item" onclick="openAgpeya()"><span>🙏</span><small>الأجبية</small></button>
       <button type="button" class="home-nav-item" onclick="showFavorites()"><span>⭐</span><small>المفضلة</small></button>
     </nav>
@@ -122,9 +119,24 @@
     </div>
   </div>
 
+  <div id="kholagy-menu-screen" class="screen">
+    <header class="top-bar">
+      <button type="button" onclick="openKholagy()">→</button>
+      <h2>الخولاجي المقدس ✝️</h2>
+      <span></span>
+    </header>
+    <div class="menu-grid inner-menu-grid">
+      <div class="menu-card" onclick="openFeasts()"><div class="icon">✝️</div><h3>الأعياد والمناسبات</h3><p>اختيار المناسبة الكنسية</p></div>
+      <div class="menu-card" onclick="openKatameros()"><div class="icon">📜</div><h3>القطمارس</h3><p>قراءات الكنيسة اليومية</p></div>
+      <div class="menu-card" onclick="openSynaxarium()"><div class="icon">🕊️</div><h3>السنكسار</h3><p>تذكارات وسير القديسين</p></div>
+      <div class="menu-card" onclick="openLiturgy('gregorian')"><div class="icon">⛪</div><h3>القداس الغريغوري</h3><p>صلوات القداس الإلهي</p></div>
+      <div class="menu-card" onclick="openLiturgy('basilian')"><div class="icon">✝️</div><h3>القداس الباسيلي</h3><p>صلوات القداس الإلهي</p></div>
+    </div>
+  </div>
+
   <div id="katameros-screen" class="screen">
     <header class="top-bar">
-      <button onclick="goHome()">→</button>
+      <button onclick="openKholagy()">→</button>
       <h2>القطمارس اليوم 📜</h2>
       <span></span>
     </header>
@@ -138,12 +150,13 @@
       <div id="katameros-content" class="daily-reading-list">
         <div class="loading-card">جاري تحميل قراءات اليوم من الإنترنت…</div>
       </div>
+
     </div>
   </div>
 
   <div id="synaxarium-screen" class="screen">
     <header class="top-bar">
-      <button onclick="goHome()">→</button>
+      <button onclick="openKholagy()">→</button>
       <h2>السنكسار اليومي 🕊️</h2>
       <span></span>
     </header>
@@ -156,6 +169,36 @@
       <div id="synaxarium-date" class="daily-date"></div>
       <div id="synaxarium-content" class="synaxarium-content">
         <div class="loading-card">جاري تحميل سنكسار اليوم من الإنترنت…</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="liturgy-screen" class="screen">
+    <header class="top-bar">
+      <button type="button" onclick="openKholagy()">→</button>
+      <h2 id="liturgy-title">القداس الإلهي</h2>
+      <span></span>
+    </header>
+    <div class="daily-content">
+      <div id="liturgy-content" class="daily-reading-list">
+        <div class="loading-card">لم يُضف نص هذا القداس إلى المشروع بعد. أضف نسخة موثوقة أو مرخّصة من الخولاجي الخاص به لعرض الصلوات كاملة.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="feasts-screen" class="screen">
+    <header class="top-bar">
+      <button type="button" onclick="openKholagy()">→</button>
+      <h2>الخولاجي المقدس ✝️</h2>
+      <span></span>
+    </header>
+    <div class="daily-content">
+      <section class="feasts-explorer">
+        <div class="feasts-intro"><span class="feasts-intro-icon">✝</span><div><strong>الأعياد والمناسبات الكنسية</strong><small>اختر المناسبة لعرض محتواها داخل الخولاجي المقدس</small></div><span id="feasts-count" class="feasts-count"></span></div>
+        <div id="feasts-list" class="feasts-list" aria-label="اختيار العيد"></div>
+      </section>
+      <div id="feasts-content" class="selected-psalm-view feasts-reading">
+        <div class="loading-card">اختر عيدًا أو مناسبة لعرض محتواها.</div>
       </div>
     </div>
   </div>
@@ -289,22 +332,42 @@
         <div class="setting-row">
           <div>
             <strong>حجم الخط</strong>
-            <p id="settings-font-size">20px</p>
+            <p id="settings-font-size">100%</p>
           </div>
           <div class="font-actions">
-            <button class="setting-action" onclick="changeFontSize(-1); updateSettingsUI()">A-</button>
-            <button class="setting-action" onclick="changeFontSize(1); updateSettingsUI()">A+</button>
+            <button class="setting-action" onclick="changeFontSize(-1)" aria-label="تصغير الخط">A−</button>
+            <button class="setting-action" onclick="changeFontSize(1)" aria-label="تكبير الخط">A+</button>
           </div>
+        </div>
+        <div class="font-scale-setting">
+          <label for="font-scale-slider">حجم الخط من 10% إلى 200%</label>
+          <input id="font-scale-slider" type="range" min="10" max="200" step="5" value="100" oninput="setFontScale(this.value)">
+          <div class="font-scale-hints"><span>10%</span><span>100%</span><span>200%</span></div>
         </div>
         <div class="setting-row">
           <div>
-            <strong>حجم الأيقونات</strong>
-            <p id="settings-icon-size">100%</p>
+            <strong>نوع الخط</strong>
+            <p>اختر الخط الأنسب للقراءة</p>
+          </div>
+          <select id="font-family-picker" class="font-family-picker" onchange="setAppFontFamily(this.value)" aria-label="نوع الخط">
+            <option value="Cairo">القاهرة — واضح ومناسب للواجهة</option>
+            <option value="Amiri">الأميري — مناسب للنصوص الطويلة</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div>
+            <strong>حجم مربعات الأيقونات</strong>
+            <p id="settings-tile-size">100%</p>
           </div>
           <div class="font-actions">
-            <button class="setting-action" onclick="changeIconSize(-1); updateSettingsUI()" aria-label="تصغير الأيقونات">−</button>
-            <button class="setting-action" onclick="changeIconSize(1); updateSettingsUI()" aria-label="تكبير الأيقونات">+</button>
+            <button class="setting-action" onclick="changeTileSize(-1); updateSettingsUI()" aria-label="تصغير المربعات">−</button>
+            <button class="setting-action" onclick="changeTileSize(1); updateSettingsUI()" aria-label="تكبير المربعات">+</button>
           </div>
+        </div>
+        <div class="icon-scale-setting">
+          <label for="tile-scale-slider">تحكم في حجم مربعات الأيقونات من 75% إلى 115%</label>
+          <input id="tile-scale-slider" type="range" min="75" max="115" step="1" value="100" oninput="setTileScale(this.value)">
+          <div class="font-scale-hints"><span>75%</span><span>100%</span><span>115%</span></div>
         </div>
       </section>
 
@@ -334,8 +397,30 @@
     </div>
   </div>
 
+  <div id="hymns-screen" class="screen">
+    <header class="top-bar">
+      <button type="button" onclick="goHome()">→</button>
+      <h2>الألحان والذكسولوجيات 🎶</h2>
+      <span></span>
+    </header>
+    <div class="hymns-container">
+      <p class="hymns-intro">أضف النصوص واحفظها على جهازك. لكل ذكسولوجية خانات للمقدمة والنص والخاتمة، ويمكنك تعديلها في أي وقت.</p>
+      <div class="hymns-category-grid">
+        <button type="button" class="hymn-category-btn" onclick="selectHymnCategory('naqoos')">🔔 أرباع الناقوس</button>
+        <button type="button" class="hymn-category-btn" onclick="selectHymnCategory('adam')">📜 آدم</button>
+        <button type="button" class="hymn-category-btn" onclick="selectHymnCategory('atos')">📜 أطس</button>
+        <button type="button" class="hymn-category-btn" onclick="selectHymnCategory('doxologies')">✝️ الذكسولوجيات</button>
+      </div>
+      <div id="hymns-active-title" class="hymns-active-title">اختر قسمًا للبدء</div>
+      <div id="hymns-list"></div>
+      <button id="add-hymn-btn" class="add-hymn-btn" type="button" onclick="addHymnEntry()" hidden>＋ إضافة نص جديد</button>
+      <p class="hymns-storage-note">💾 تُحفظ التعديلات محليًا على هذا الجهاز والمتصفح.</p>
+    </div>
+  </div>
+
   <script src="data.js"></script>
   <script src="agpeya_text.js"></script>
+  <script src="katameros_code_texts.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
